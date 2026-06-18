@@ -1,9 +1,9 @@
 import { cloneDocument } from "./document";
 import type { LayoutGraph, LayoutResult, MindMapDocument, MindMapNode, NodeId, Point } from "./types";
 
-const MIN_NODE_WIDTH = 104;
-const MAX_NODE_WIDTH = 360;
-const NODE_HORIZONTAL_PADDING = 44;
+export const MIN_NODE_WIDTH = 56;
+export const MAX_NODE_WIDTH = 360;
+export const NODE_HORIZONTAL_PADDING = 32;
 const NODE_BASE_HEIGHT = 46;
 const NODE_LINE_HEIGHT = 18;
 const CHARACTER_WIDTH = 7.4;
@@ -21,15 +21,41 @@ function clamp(value: number, min: number, max: number): number {
   return Math.min(max, Math.max(min, value));
 }
 
-function getMetadataNumber(node: MindMapNode, key: string): number | undefined {
+function getMetadataNumber(node: Pick<MindMapNode, "metadata">, key: string): number | undefined {
   const value = node.metadata[key];
   return typeof value === "number" && Number.isFinite(value) ? value : undefined;
 }
 
+function getTitleCharacterWidth(character: string): number {
+  const codePoint = character.codePointAt(0) ?? 0;
+  if (
+    (codePoint >= 0x2e80 && codePoint <= 0x9fff) ||
+    (codePoint >= 0xac00 && codePoint <= 0xd7af) ||
+    (codePoint >= 0xff01 && codePoint <= 0xff60)
+  ) {
+    return 14;
+  }
+  if (/\s/.test(character)) return 4;
+  if (/[A-Z0-9]/.test(character)) return 8.2;
+  return CHARACTER_WIDTH;
+}
+
+export function estimateLayoutTitleWidth(title: string): number {
+  return Array.from(title).reduce((total, character) => total + getTitleCharacterWidth(character), 0);
+}
+
+export function getNodeWidthOverride(node: Pick<MindMapNode, "metadata">): number | undefined {
+  return getMetadataNumber(node, "nodeWidth");
+}
+
+export function estimateLayoutNodeWidth(node: Pick<MindMapNode, "metadata" | "title">): number {
+  return clamp(getNodeWidthOverride(node) ?? estimateLayoutTitleWidth(node.title) + NODE_HORIZONTAL_PADDING, MIN_NODE_WIDTH, MAX_NODE_WIDTH);
+}
+
 function estimateNodeSize(node: MindMapNode) {
   const scale = node.style.scale ?? 1;
-  const textWidth = node.title.length * CHARACTER_WIDTH + NODE_HORIZONTAL_PADDING;
-  const width = clamp(getMetadataNumber(node, "nodeWidth") ?? textWidth, MIN_NODE_WIDTH, MAX_NODE_WIDTH);
+  const textWidth = estimateLayoutTitleWidth(node.title) + NODE_HORIZONTAL_PADDING;
+  const width = estimateLayoutNodeWidth(node);
   const lineCount = Math.max(1, Math.ceil(textWidth / width));
   const statusHeight = node.task ? 20 : 0;
   const height = NODE_BASE_HEIGHT + (lineCount - 1) * NODE_LINE_HEIGHT + statusHeight;
@@ -116,11 +142,10 @@ function simpleDirectionalLayout(document: MindMapDocument, rootId: NodeId, star
 export function documentToLayoutGraph(document: MindMapDocument): LayoutGraph {
   const nodes = Object.values(document.nodes).map((node) => {
     const scale = node.style.scale ?? 1;
-    const metadataWidth = getMetadataNumber(node, "nodeWidth");
     return {
       id: node.id,
       parentId: node.parentId,
-      width: (metadataWidth ?? Math.max(140, node.title.length * 8 + 48)) * scale,
+      width: estimateLayoutNodeWidth(node) * scale,
       height: 56 * scale,
       position: { ...node.position },
       data: {

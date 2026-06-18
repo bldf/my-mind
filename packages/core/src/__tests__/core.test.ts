@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   createEmptyDocument,
+  documentToLayoutGraph,
   dispatchCommand,
   exportIndentedText,
   importIndentedText,
@@ -62,5 +63,21 @@ describe("@my-mind-node/core", () => {
 
     expect(layout.positions[children[0]!]!.x).toBeLessThan(root.x);
     expect(layout.positions[children[1]!]!.x).toBeGreaterThan(root.x);
+  });
+
+  it("adapts estimated node width to mixed-language titles", () => {
+    let document = createEmptyDocument({ rootTitle: "Root" });
+    for (const title of ["IP", "agents客户端"]) {
+      const result = dispatchCommand(document, { type: "node.create", parentId: document.rootId, title });
+      if (!result.ok) throw new Error("command failed");
+      document = result.document;
+    }
+
+    const graph = documentToLayoutGraph(document);
+    const compact = graph.nodes.find((node) => node.data.title === "IP")!;
+    const mixed = graph.nodes.find((node) => node.data.title === "agents客户端")!;
+
+    expect(compact.width).toBeLessThan(mixed.width);
+    expect(compact.width).toBeLessThan(80);
   });
 });

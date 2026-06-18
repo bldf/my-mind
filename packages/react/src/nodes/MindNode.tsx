@@ -1,4 +1,4 @@
-import type { MindMapNode, NodeId } from "@my-mind-node/core";
+import { estimateLayoutNodeWidth, getNodeWidthOverride, type MindMapNode, type NodeId } from "@my-mind-node/core";
 import { Minus, MoveRight, Plus } from "lucide-react";
 import { memo, useState } from "react";
 import type { ReactNode } from "react";
@@ -14,10 +14,9 @@ export interface MindNodeData extends Record<string, unknown> {
   renderNode?: (node: MindMapNode, selected: boolean) => ReactNode;
 }
 
-function getNodeWidth(node: MindMapNode): number {
-  const width = node.metadata.nodeWidth;
-  if (typeof width === "number" && Number.isFinite(width)) return Math.min(360, Math.max(88, width));
-  return Math.min(320, Math.max(104, node.title.length * 7.4 + 44));
+function getNodeWidth(node: MindMapNode, readonly: boolean): number | undefined {
+  if (readonly && getNodeWidthOverride(node) === undefined) return undefined;
+  return estimateLayoutNodeWidth(node);
 }
 
 export const MindNode = memo(function MindNode(props: NodeProps) {
@@ -36,7 +35,7 @@ export const MindNode = memo(function MindNode(props: NodeProps) {
         .filter(Boolean)
         .join(" ")}
       style={{
-        width: getNodeWidth(node),
+        width: getNodeWidth(node, Boolean(data.readonly)),
         transform: `scale(${scale})`,
         borderColor: node.style.borderColor,
         background: node.style.backgroundColor,

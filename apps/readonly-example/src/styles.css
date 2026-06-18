@@ -36,7 +36,6 @@ body {
 }
 
 .readonly-demo .mmn-node {
-  min-width: 132px;
   min-height: 52px;
   padding: 10px 16px;
 }
