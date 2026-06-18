@@ -6,7 +6,7 @@
 
 ## 项目信息
 
-- 项目名: my-mind-node
+- 项目名: my-mind
 - 架构类型: monorepo
 - 需求来源: `docs/prd-mind-map.md` M4
 
