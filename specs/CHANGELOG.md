@@ -1,5 +1,15 @@
 # Changelog
 
+## 2026-06-18 - M0-M4 implementation in current repo
+
+按 `my-ai-auto-dev` 执行 6 个 feature specs，并在当前仓库初始化 `my-mind-node` pnpm monorepo：
+
+- 新增 `@my-mind-node/core`，覆盖 schema、校验、命令、历史、搜索、布局转换、JSON 和缩进文本。
+- 新增 `@my-mind-node/react`，覆盖 Editor/Viewer、React Flow 适配、工具栏、主题、面包屑、节点缩放、大纲、搜索和检查器。
+- 新增 `@my-mind-node/importers` 与 `@my-mind-node/exporters`，保持导入导出能力为可选包。
+- 新增 Vite playground、VitePress docs、Next.js/readonly/custom-node 示例、GitHub Pages workflow、fixtures、bench、bundle budget、a11y 报告和 Playwright E2E。
+- 6 个 `tasks.md` 共 75 个任务均已标记为 `[x]`。
+
 ## 2026-06-18 - PRD milestone specs
 
 从 `docs/prd-mind-map.md` 拆分出 6 个可执行 feature specs：

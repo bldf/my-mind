@@ -1,0 +1,25 @@
+{
+  "name": "@my-mind-node/playground",
+  "private": true,
+  "version": "0.1.0-beta.0",
+  "type": "module",
+  "scripts": {
+    "dev": "vite --host 127.0.0.1",
+    "build": "vite build",
+    "typecheck": "tsc --noEmit",
+    "lint": "eslint src --max-warnings=0"
+  },
+  "dependencies": {
+    "@my-mind-node/core": "workspace:*",
+    "@my-mind-node/exporters": "workspace:*",
+    "@my-mind-node/importers": "workspace:*",
+    "@my-mind-node/react": "workspace:*",
+    "@vitejs/plugin-react": "^4.5.2",
+    "vite": "^6.3.5",
+    "react": "^19.1.0",
+    "react-dom": "^19.1.0"
+  },
+  "devDependencies": {
+    "typescript": "^5.8.3"
+  }
+}

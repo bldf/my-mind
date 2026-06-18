@@ -16,24 +16,24 @@
 
 ### 功能 1: 包与文本导入导出
 
-- [ ] T-001: 创建 `@my-mind-node/importers` 和 `@my-mind-node/exporters` 包，配置 ESM only、types、tests 和 exports ~1h
-- [ ] T-002: 实现 Markdown 导入，覆盖标题、列表、缩进和异常输入测试 ~1h
-- [ ] T-003: 实现 OPML 导入，覆盖层级、文本和安全 XML 解析 ~1h
-- [ ] T-004: 实现 Markdown、OPML、缩进文本、JSON 导出和往返测试 ~1h
+- [x] T-001: 创建 `@my-mind-node/importers` 和 `@my-mind-node/exporters` 包，配置 ESM only、types、tests 和 exports ~1h
+- [x] T-002: 实现 Markdown 导入，覆盖标题、列表、缩进和异常输入测试 ~1h
+- [x] T-003: 实现 OPML 导入，覆盖层级、文本和安全 XML 解析 ~1h
+- [x] T-004: 实现 Markdown、OPML、缩进文本、JSON 导出和往返测试 ~1h
 
 ### 功能 2: PNG/SVG 与 React 集成
 
-- [ ] T-005: 实现 `ExportOptions`、导出错误码和统一 `exportMindMap` 接口 ~45min
-- [ ] T-006: 实现 PNG 导出当前视图/完整导图、像素倍率和背景色选项 ~1h
-- [ ] T-007: 实现 SVG 导出、主题样式内联和浏览器 E2E 验证 ~1h
-- [ ] T-008: 在 React 工具栏中接入可选导出入口，确保 importers/exporters 不进入默认 bundle ~1h
+- [x] T-005: 实现 `ExportOptions`、导出错误码和统一 `exportMindMap` 接口 ~45min
+- [x] T-006: 实现 PNG 导出当前视图/完整导图、像素倍率和背景色选项 ~1h
+- [x] T-007: 实现 SVG 导出、主题样式内联和浏览器 E2E 验证 ~1h
+- [x] T-008: 在 React 工具栏中接入可选导出入口，确保 importers/exporters 不进入默认 bundle ~1h
 
 ### 功能 3: 示例与验证
 
-- [ ] T-009: 补齐 Next.js 示例，验证 SSR import 安全 ~1h
-- [ ] T-010: 补齐 readonly 和 custom-node 示例 ~1h
-- [ ] T-011: 完成 GitHub Pages 示例页面构建命令和部署说明 ~45min
-- [ ] T-012: 补齐导入导出 E2E、bundle 检查、build/test/typecheck/lint 验证 ~1h
+- [x] T-009: 补齐 Next.js 示例，验证 SSR import 安全 ~1h
+- [x] T-010: 补齐 readonly 和 custom-node 示例 ~1h
+- [x] T-011: 完成 GitHub Pages 示例页面构建命令和部署说明 ~45min
+- [x] T-012: 补齐导入导出 E2E、bundle 检查、build/test/typecheck/lint 验证 ~1h
 
 ## 依赖关系
 

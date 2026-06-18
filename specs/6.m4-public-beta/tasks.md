@@ -16,24 +16,24 @@
 
 ### 功能 1: 文档与示例
 
-- [ ] T-001: 初始化文档站点，完成快速开始、核心概念、React 集成和隐私边界页面 ~1h
-- [ ] T-002: 编写只读模式、自定义节点、主题、导入导出、错误处理和 SSR 指南 ~1h
-- [ ] T-003: 生成 API reference，标记 stable/experimental 并对齐 package exports ~1h
-- [ ] T-004: 完成 GitHub Pages 在线示例页面和静态部署配置 ~1h
+- [x] T-001: 初始化文档站点，完成快速开始、核心概念、React 集成和隐私边界页面 ~1h
+- [x] T-002: 编写只读模式、自定义节点、主题、导入导出、错误处理和 SSR 指南 ~1h
+- [x] T-003: 生成 API reference，标记 stable/experimental 并对齐 package exports ~1h
+- [x] T-004: 完成 GitHub Pages 在线示例页面和静态部署配置 ~1h
 
 ### 功能 2: 发布门槛验证
 
-- [ ] T-005: 建立 100/500/1000 节点性能基准，覆盖渲染、搜索、拖拽和导出 ~1h
-- [ ] T-006: 建立浏览器兼容性 E2E 矩阵，覆盖 Chrome、Edge、Safari、Firefox ~1h
-- [ ] T-007: 建立可访问性检查和键盘路径走查，记录 WCAG AA 与状态表达结果 ~1h
-- [ ] T-008: 建立 bundle 预算检查，验证 core/react/importers/exporters 体积和默认依赖边界 ~1h
+- [x] T-005: 建立 100/500/1000 节点性能基准，覆盖渲染、搜索、拖拽和导出 ~1h
+- [x] T-006: 建立浏览器兼容性 E2E 矩阵，覆盖 Chrome、Edge、Safari、Firefox ~1h
+- [x] T-007: 建立可访问性检查和键盘路径走查，记录 WCAG AA 与状态表达结果 ~1h
+- [x] T-008: 建立 bundle 预算检查，验证 core/react/importers/exporters 体积和默认依赖边界 ~1h
 
 ### 功能 3: Beta 发布准备
 
-- [ ] T-009: 编写公开 API 迁移说明、breaking-change 规则和 Beta 限制说明 ~1h
-- [ ] T-010: 使用 Changesets 准备 beta release notes 和 package metadata 检查 ~45min
-- [ ] T-011: 完成 README、文档站点、示例、API reference、CHANGELOG 一致性检查 ~45min
-- [ ] T-012: 运行完整 build/test/typecheck/lint/e2e/bench，输出 Public Beta 验收报告 ~1h
+- [x] T-009: 编写公开 API 迁移说明、breaking-change 规则和 Beta 限制说明 ~1h
+- [x] T-010: 使用 Changesets 准备 beta release notes 和 package metadata 检查 ~45min
+- [x] T-011: 完成 README、文档站点、示例、API reference、CHANGELOG 一致性检查 ~45min
+- [x] T-012: 运行完整 build/test/typecheck/lint/e2e/bench，输出 Public Beta 验收报告 ~1h
 
 ## 依赖关系
 

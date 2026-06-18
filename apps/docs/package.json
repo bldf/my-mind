@@ -1,0 +1,15 @@
+{
+  "name": "@my-mind-node/docs",
+  "private": true,
+  "version": "0.1.0-beta.0",
+  "type": "module",
+  "scripts": {
+    "dev": "vitepress dev docs --host 127.0.0.1",
+    "build": "vitepress build docs",
+    "typecheck": "tsc --noEmit"
+  },
+  "devDependencies": {
+    "typescript": "^5.8.3",
+    "vitepress": "^1.6.3"
+  }
+}

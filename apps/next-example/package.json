@@ -1,0 +1,21 @@
+{
+  "name": "@my-mind-node/next-example",
+  "private": true,
+  "version": "0.1.0-beta.0",
+  "type": "module",
+  "scripts": {
+    "dev": "next dev",
+    "build": "next build",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@my-mind-node/core": "workspace:*",
+    "@my-mind-node/react": "workspace:*",
+    "next": "^15.3.4",
+    "react": "^19.1.0",
+    "react-dom": "^19.1.0"
+  },
+  "devDependencies": {
+    "typescript": "^5.8.3"
+  }
+}
