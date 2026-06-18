@@ -16,7 +16,6 @@ import {
   type SelectionState,
 } from "@my-mind-node/core";
 import {
-  Background,
   Controls,
   MiniMap,
   ReactFlow,
@@ -299,7 +298,6 @@ function EditorCanvas(props: MindMapEditorProps) {
             enterViewRoot(selection.nodeIds[0] ?? viewRootId);
           }}
         >
-          <Background color={theme.colors.edge} gap={24} />
           <MiniMap pannable zoomable />
           <Controls showInteractive={false} />
         </ReactFlow>

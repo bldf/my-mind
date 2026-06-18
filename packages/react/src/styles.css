@@ -13,7 +13,13 @@
   border: 1px solid rgba(17, 24, 39, 0.12);
   border-radius: 8px;
   font-family:
-    Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    Inter,
+    ui-sans-serif,
+    system-ui,
+    -apple-system,
+    BlinkMacSystemFont,
+    "Segoe UI",
+    sans-serif;
 }
 
 .mmn-breadcrumbs {
@@ -88,14 +94,15 @@
   display: grid;
   gap: 6px;
   width: 176px;
-  min-height: 44px;
-  padding: 10px 12px;
+  min-height: 38px;
+  align-items: center;
+  padding: 8px 14px;
   transform-origin: center;
   background: var(--mmn-node);
-  border: 1.5px solid rgba(100, 116, 139, 0.3);
-  border-radius: 7px;
+  border: 1px solid rgba(100, 116, 139, 0.16);
+  border-radius: 8px;
   color: var(--mmn-node-text);
-  box-shadow: 0 2px 7px rgba(15, 23, 42, 0.08);
+  box-shadow: none;
 }
 
 .mmn-node--selected {
@@ -115,14 +122,17 @@
   color: inherit;
   font: inherit;
   font-size: 13px;
-  font-weight: 700;
+  font-weight: 600;
   letter-spacing: 0;
+  line-height: 1.35;
 }
 
 .mmn-node__title--readonly {
   justify-content: flex-start;
   padding: 0;
   text-align: left;
+  white-space: normal;
+  overflow-wrap: anywhere;
 }
 
 .mmn-node__title:focus {
@@ -167,7 +177,9 @@
 
 .mmn-edge {
   stroke: var(--mmn-edge);
-  stroke-width: 2.25;
+  stroke-width: 3.5;
+  stroke-linecap: round;
+  stroke-linejoin: round;
 }
 
 .mmn-edge--selected {
@@ -191,6 +203,10 @@
   color: var(--mmn-node-text);
   font-size: 12px;
   pointer-events: all;
+}
+
+.react-flow__attribution {
+  display: none;
 }
 
 .mmn-theme-panel,
@@ -358,7 +374,13 @@
   border-radius: 8px;
   color: #111827;
   font-family:
-    Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    Inter,
+    ui-sans-serif,
+    system-ui,
+    -apple-system,
+    BlinkMacSystemFont,
+    "Segoe UI",
+    sans-serif;
 }
 
 .mmn-outline header {

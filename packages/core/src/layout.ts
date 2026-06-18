@@ -2,7 +2,7 @@ import { cloneDocument } from "./document";
 import type { LayoutGraph, LayoutResult, MindMapDocument, MindMapNode, NodeId, Point } from "./types";
 
 const MIN_NODE_WIDTH = 104;
-const MAX_NODE_WIDTH = 320;
+const MAX_NODE_WIDTH = 360;
 const NODE_HORIZONTAL_PADDING = 44;
 const NODE_BASE_HEIGHT = 46;
 const NODE_LINE_HEIGHT = 18;
@@ -21,10 +21,15 @@ function clamp(value: number, min: number, max: number): number {
   return Math.min(max, Math.max(min, value));
 }
 
+function getMetadataNumber(node: MindMapNode, key: string): number | undefined {
+  const value = node.metadata[key];
+  return typeof value === "number" && Number.isFinite(value) ? value : undefined;
+}
+
 function estimateNodeSize(node: MindMapNode) {
   const scale = node.style.scale ?? 1;
   const textWidth = node.title.length * CHARACTER_WIDTH + NODE_HORIZONTAL_PADDING;
-  const width = clamp(textWidth, MIN_NODE_WIDTH, MAX_NODE_WIDTH);
+  const width = clamp(getMetadataNumber(node, "nodeWidth") ?? textWidth, MIN_NODE_WIDTH, MAX_NODE_WIDTH);
   const lineCount = Math.max(1, Math.ceil(textWidth / width));
   const statusHeight = node.task ? 20 : 0;
   const height = NODE_BASE_HEIGHT + (lineCount - 1) * NODE_LINE_HEIGHT + statusHeight;
@@ -111,10 +116,11 @@ function simpleDirectionalLayout(document: MindMapDocument, rootId: NodeId, star
 export function documentToLayoutGraph(document: MindMapDocument): LayoutGraph {
   const nodes = Object.values(document.nodes).map((node) => {
     const scale = node.style.scale ?? 1;
+    const metadataWidth = getMetadataNumber(node, "nodeWidth");
     return {
       id: node.id,
       parentId: node.parentId,
-      width: Math.max(140, node.title.length * 8 + 48) * scale,
+      width: (metadataWidth ?? Math.max(140, node.title.length * 8 + 48)) * scale,
       height: 56 * scale,
       position: { ...node.position },
       data: {

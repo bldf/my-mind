@@ -14,8 +14,10 @@ export interface MindNodeData extends Record<string, unknown> {
   renderNode?: (node: MindMapNode, selected: boolean) => ReactNode;
 }
 
-function getNodeWidth(title: string): number {
-  return Math.min(320, Math.max(104, title.length * 7.4 + 44));
+function getNodeWidth(node: MindMapNode): number {
+  const width = node.metadata.nodeWidth;
+  if (typeof width === "number" && Number.isFinite(width)) return Math.min(360, Math.max(88, width));
+  return Math.min(320, Math.max(104, node.title.length * 7.4 + 44));
 }
 
 export const MindNode = memo(function MindNode(props: NodeProps) {
@@ -34,7 +36,7 @@ export const MindNode = memo(function MindNode(props: NodeProps) {
         .filter(Boolean)
         .join(" ")}
       style={{
-        width: getNodeWidth(node.title),
+        width: getNodeWidth(node),
         transform: `scale(${scale})`,
         borderColor: node.style.borderColor,
         background: node.style.backgroundColor,
