@@ -21,6 +21,7 @@ Codex/Claude automation workspace for My Mind Node PRD, local skills, prompts, a
 ```text
 .
 ├── docs/                     # My Mind Node 产品/需求文档
+├── specs/                    # 从 PRD 拆分的 my-ai-auto-dev 编号 feature specs
 ├── .codex/
 │   ├── agents/               # Codex subagent 定义
 │   ├── prompts/              # Codex slash prompts 与 my-ai 节点
@@ -38,4 +39,3 @@ Codex 执行任务前应读取：
 - `.codex/rules/testing.md`
 - `.codex/rules/security.md`
 - `.codex/rules/git-workflow.md`
-
