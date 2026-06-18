@@ -14,6 +14,10 @@ export interface MindNodeData extends Record<string, unknown> {
   renderNode?: (node: MindMapNode, selected: boolean) => ReactNode;
 }
 
+function getNodeWidth(title: string): number {
+  return Math.min(320, Math.max(104, title.length * 7.4 + 44));
+}
+
 export const MindNode = memo(function MindNode(props: NodeProps) {
   const data = props.data as MindNodeData;
   const node = data.node;
@@ -30,6 +34,7 @@ export const MindNode = memo(function MindNode(props: NodeProps) {
         .filter(Boolean)
         .join(" ")}
       style={{
+        width: getNodeWidth(node.title),
         transform: `scale(${scale})`,
         borderColor: node.style.borderColor,
         background: node.style.backgroundColor,
@@ -38,7 +43,10 @@ export const MindNode = memo(function MindNode(props: NodeProps) {
       }}
       data-node-id={node.id}
     >
-      <Handle type="target" position={Position.Left} />
+      <Handle id="target-top" className="mmn-node__handle" type="target" position={Position.Top} />
+      <Handle id="target-right" className="mmn-node__handle" type="target" position={Position.Right} />
+      <Handle id="target-bottom" className="mmn-node__handle" type="target" position={Position.Bottom} />
+      <Handle id="target-left" className="mmn-node__handle" type="target" position={Position.Left} />
       {data.renderNode ? (
         <div className="mmn-node__custom">{data.renderNode(node, Boolean(props.selected))}</div>
       ) : data.readonly ? (
@@ -73,7 +81,10 @@ export const MindNode = memo(function MindNode(props: NodeProps) {
           </button>
         </div>
       ) : null}
-      <Handle type="source" position={Position.Right} />
+      <Handle id="source-top" className="mmn-node__handle" type="source" position={Position.Top} />
+      <Handle id="source-right" className="mmn-node__handle" type="source" position={Position.Right} />
+      <Handle id="source-bottom" className="mmn-node__handle" type="source" position={Position.Bottom} />
+      <Handle id="source-left" className="mmn-node__handle" type="source" position={Position.Left} />
     </div>
   );
 });

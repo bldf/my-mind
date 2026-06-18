@@ -22,8 +22,9 @@ import {
   ReactFlow,
   ReactFlowProvider,
   useReactFlow,
+  useNodesInitialized,
 } from "@xyflow/react";
-import { useCallback, useMemo, useRef, useState, type CSSProperties, type KeyboardEvent } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties, type KeyboardEvent } from "react";
 import { documentToFlow } from "./document-to-flow";
 import { BezierEdge } from "./edges/BezierEdge";
 import { MindNode } from "./nodes/MindNode";
@@ -57,7 +58,9 @@ function EditorCanvas(props: MindMapEditorProps) {
   const [localTheme, setLocalTheme] = useState<MindMapTheme | undefined>(props.theme);
   const history = useRef<HistoryState>({ past: [], future: [] });
   const containerRef = useRef<HTMLDivElement>(null);
+  const lastAutoFitKey = useRef("");
   const flow = useReactFlow();
+  const nodesInitialized = useNodesInitialized();
   const theme = resolveTheme(localTheme ?? props.theme, document.theme);
   const themes = props.themePanel?.themes ?? defaultThemes;
   const selectedNodeId = selection.nodeIds[0];
@@ -250,6 +253,16 @@ function EditorCanvas(props: MindMapEditorProps) {
   } as CSSProperties;
 
   const controls = props.toolbar?.controls ?? DEFAULT_TOOLBAR;
+  const autoFitKey = `${document.id}:${viewRootId}:${flowData.nodes.length}`;
+
+  useEffect(() => {
+    if (props.viewport?.fitViewOnInit === false || !nodesInitialized || flowData.nodes.length === 0) return;
+    if (lastAutoFitKey.current === autoFitKey) return;
+    lastAutoFitKey.current = autoFitKey;
+
+    const frame = requestAnimationFrame(() => flow.fitView({ padding: 0.12 }));
+    return () => cancelAnimationFrame(frame);
+  }, [autoFitKey, flow, flowData.nodes.length, nodesInitialized, props.viewport?.fitViewOnInit]);
 
   return (
     <div ref={containerRef} className={["mmn-editor", props.className].filter(Boolean).join(" ")} style={style} onKeyDown={onKeyDown} tabIndex={0}>
@@ -264,6 +277,7 @@ function EditorCanvas(props: MindMapEditorProps) {
           nodeTypes={nodeTypes}
           edgeTypes={edgeTypes}
           fitView={props.viewport?.fitViewOnInit ?? true}
+          minZoom={0.08}
           zoomOnScroll={props.viewport?.zoomOnScroll ?? false}
           panOnDrag={props.viewport?.panOnDrag ?? true}
           nodesDraggable={!readonly}

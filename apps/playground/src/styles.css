@@ -22,7 +22,7 @@ textarea {
 
 .workspace {
   display: grid;
-  grid-template-columns: minmax(320px, 36vw) minmax(0, 1fr);
+  grid-template-columns: minmax(300px, 28vw) minmax(0, 1fr);
   gap: 16px;
   height: calc(100vh - 32px);
 }

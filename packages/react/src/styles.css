@@ -86,16 +86,16 @@
 .mmn-node {
   position: relative;
   display: grid;
-  gap: 8px;
+  gap: 6px;
   width: 176px;
-  min-height: 58px;
-  padding: 12px 14px;
+  min-height: 44px;
+  padding: 10px 12px;
   transform-origin: center;
   background: var(--mmn-node);
   border: 1.5px solid rgba(100, 116, 139, 0.3);
-  border-radius: 8px;
+  border-radius: 7px;
   color: var(--mmn-node-text);
-  box-shadow: 0 12px 30px rgba(15, 23, 42, 0.09);
+  box-shadow: 0 2px 7px rgba(15, 23, 42, 0.08);
 }
 
 .mmn-node--selected {
@@ -114,6 +114,7 @@
   background: transparent;
   color: inherit;
   font: inherit;
+  font-size: 13px;
   font-weight: 700;
   letter-spacing: 0;
 }
@@ -136,6 +137,19 @@
   border-radius: 999px;
   font-size: 11px;
   text-transform: uppercase;
+}
+
+.mmn-node__custom {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.mmn-node__handle {
+  width: 1px;
+  height: 1px;
+  border: 0;
+  background: transparent;
+  opacity: 0;
 }
 
 .mmn-node__quick {

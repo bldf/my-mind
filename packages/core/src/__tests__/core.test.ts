@@ -7,6 +7,7 @@ import {
   parseDocument,
   searchDocument,
   serializeDocument,
+  simpleTreeLayout,
   validateDocument,
 } from "../index";
 
@@ -44,5 +45,22 @@ describe("@my-mind-node/core", () => {
     if (!result.ok) throw new Error("command failed");
     expect(searchDocument(result.document, { query: "launch" })).toHaveLength(1);
     expect(() => serializeDocument(result.document)).not.toThrow();
+  });
+
+  it("balances root branches across both sides", () => {
+    let document = createEmptyDocument();
+    for (const title of ["Left branch", "Right branch"]) {
+      const result = dispatchCommand(document, { type: "node.create", parentId: document.rootId, title });
+      if (!result.ok) throw new Error("command failed");
+      document = result.document;
+    }
+
+    const layout = simpleTreeLayout(document);
+    const root = layout.positions[document.rootId]!;
+    const children = document.nodes[document.rootId]!.children;
+    expect(children).toHaveLength(2);
+
+    expect(layout.positions[children[0]!]!.x).toBeLessThan(root.x);
+    expect(layout.positions[children[1]!]!.x).toBeGreaterThan(root.x);
   });
 });

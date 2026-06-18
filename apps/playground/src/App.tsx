@@ -1,15 +1,97 @@
-import { parseDocument, serializeDocument, type MindMapDocument } from "@my-mind-node/core";
+import {
+  applyLayoutResult,
+  cloneDocument,
+  parseDocument,
+  serializeDocument,
+  simpleTreeLayout,
+  type MindMapDocument,
+  type NodeId,
+} from "@my-mind-node/core";
 import { exportMindMap } from "@my-mind-node/exporters";
 import { importMindMap } from "@my-mind-node/importers";
 import { MindMapEditor, OutlineEditor } from "@my-mind-node/react";
 import { useMemo, useState } from "react";
 import fixture from "../../../tests/fixtures/100-nodes.json";
 
+const BRANCH_PALETTES = {
+  left: {
+    node: "#80d0dc",
+    border: "#6fc4d1",
+    edge: "#68c2cf",
+    text: "#0f2530",
+  },
+  right: {
+    node: "#ebb0db",
+    border: "#df9bcf",
+    edge: "#e0a0d2",
+    text: "#301428",
+  },
+};
+
+function applyBranchPresentation(document: MindMapDocument): MindMapDocument {
+  const next = cloneDocument(document);
+  next.layout = { direction: "right", gapX: 180, gapY: 88 };
+  next.theme = {
+    id: "showcase",
+    name: "Showcase",
+    mode: "light",
+    colors: {
+      canvas: "#f3f4f6",
+      node: "#ffffff",
+      nodeText: "#111827",
+      edge: "#ccd4df",
+      selected: "#2563eb",
+      accent: "#0f766e",
+    },
+  };
+
+  const root = next.nodes[next.rootId];
+  if (!root) return next;
+
+  root.style = {
+    ...root.style,
+    backgroundColor: "#ffffff",
+    borderColor: "#ffffff",
+    color: "#111827",
+    fontWeight: "bold",
+    scale: 1.25,
+  };
+
+  const pivot = Math.ceil(root.children.length / 2);
+
+  const paintBranch = (nodeId: NodeId, side: "left" | "right") => {
+    const node = next.nodes[nodeId];
+    if (!node) return;
+    const palette = BRANCH_PALETTES[side];
+    node.style = {
+      ...node.style,
+      backgroundColor: palette.node,
+      borderColor: palette.border,
+      color: palette.text,
+      fontWeight: "medium",
+    };
+    node.metadata = {
+      ...node.metadata,
+      branchSide: side,
+      branchEdgeColor: palette.edge,
+    };
+    for (const childId of node.children) {
+      paintBranch(childId, side);
+    }
+  };
+
+  root.children.forEach((childId, index) => paintBranch(childId, index < pivot ? "left" : "right"));
+  return applyLayoutResult(next, simpleTreeLayout(next));
+}
+
 export default function App() {
-  const initialDocument = useMemo(() => parseDocument(JSON.stringify(fixture)), []);
+  const initialDocument = useMemo(() => {
+    const parsed = parseDocument(JSON.stringify(fixture));
+    if (!parsed.ok) throw new Error(parsed.error.message);
+    return applyBranchPresentation(parsed.value);
+  }, []);
   const [document, setDocument] = useState<MindMapDocument>(() => {
-    if (!initialDocument.ok) throw new Error(initialDocument.error.message);
-    return initialDocument.value;
+    return initialDocument;
   });
   const [json, setJson] = useState(() => serializeDocument(document));
   const [error, setError] = useState<string | undefined>();
@@ -80,7 +162,9 @@ export default function App() {
           <MindMapEditor
             value={document}
             height="100%"
-            toolbar={{ controls: ["theme", "search", "inspector", "fullscreen", "zoomOut", "zoomIn", "fitView", "export"] }}
+            breadcrumbs={{ hidden: true }}
+            inspector={{ hidden: true }}
+            toolbar={{ controls: ["theme", "search", "fullscreen", "zoomOut", "zoomIn", "fitView", "export"] }}
             onChange={updateDocument}
             onError={(mindMapError) => setError(`${mindMapError.code}: ${mindMapError.message}`)}
           />

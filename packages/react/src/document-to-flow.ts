@@ -14,6 +14,28 @@ export interface FlowConversionOptions {
   renderNode?: (node: MindMapNode, selected: boolean) => ReactNode;
 }
 
+function getMetadataString(node: MindMapNode, key: string): string | undefined {
+  const value = node.metadata[key];
+  return typeof value === "string" ? value : undefined;
+}
+
+function getEdgeColor(source: MindMapNode, target: MindMapNode): string | undefined {
+  return (
+    getMetadataString(target, "branchEdgeColor") ??
+    getMetadataString(source, "branchEdgeColor") ??
+    target.style.borderColor ??
+    source.style.borderColor
+  );
+}
+
+function getTreeEdgeHandles(source: MindMapNode, target: MindMapNode) {
+  const deltaX = target.position.x - source.position.x;
+
+  return deltaX < 0
+    ? { sourceHandle: "source-left", targetHandle: "target-right" }
+    : { sourceHandle: "source-right", targetHandle: "target-left" };
+}
+
 export function documentToFlow(document: MindMapDocument, options: FlowConversionOptions = {}) {
   const viewRootId = options.viewRootId ?? document.rootId;
   const selected = new Set(options.selectedNodeIds ?? []);
@@ -46,30 +68,45 @@ export function documentToFlow(document: MindMapDocument, options: FlowConversio
     if (!node) return [];
     return node.children
       .filter((childId) => visibleSet.has(childId))
-      .map((childId) => ({
-        id: `${node.id}->${childId}`,
-        source: node.id,
-        target: childId,
-        type: "mindBezier",
-        data: {
-          label: "",
-        },
-      }));
+      .flatMap((childId) => {
+        const child = document.nodes[childId];
+        if (!child) return [];
+        const edgeColor = getEdgeColor(node, child);
+        return {
+          id: `${node.id}->${childId}`,
+          source: node.id,
+          target: childId,
+          type: "mindBezier",
+          ...getTreeEdgeHandles(node, child),
+          style: edgeColor ? { stroke: edgeColor } : undefined,
+          data: {
+            label: "",
+          },
+        };
+      });
   });
 
   const connectionEdges: Edge[] = document.connections
     .filter((connection) => visibleSet.has(connection.sourceId) && visibleSet.has(connection.targetId))
-    .map((connection) => ({
-      id: connection.id,
-      source: connection.sourceId,
-      target: connection.targetId,
-      type: "mindBezier",
-      label: connection.label,
-      data: {
+    .flatMap((connection) => {
+      const source = document.nodes[connection.sourceId];
+      const target = document.nodes[connection.targetId];
+      if (!source || !target) return [];
+      const edgeColor = connection.style?.borderColor ?? getEdgeColor(source, target);
+      return {
+        id: connection.id,
+        source: connection.sourceId,
+        target: connection.targetId,
+        type: "mindBezier",
         label: connection.label,
-        connection,
-      },
-    }));
+        ...getTreeEdgeHandles(source, target),
+        style: edgeColor ? { stroke: edgeColor } : undefined,
+        data: {
+          label: connection.label,
+          connection,
+        },
+      };
+    });
 
   return {
     nodes,
