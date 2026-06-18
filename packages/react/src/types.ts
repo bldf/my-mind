@@ -56,6 +56,16 @@ export interface SearchConfig {
   hidden?: boolean;
 }
 
+export interface DragInteractionConfig {
+  enabled?: boolean;
+  reparentDwellMs?: number;
+  sortZoneRatio?: number;
+  flashDurationMs?: number;
+  autoLayoutOnDrop?: boolean;
+  showAddChildControl?: boolean;
+  showCollapseControl?: boolean;
+}
+
 export interface MindMapEditorProps {
   value?: MindMapDocument;
   defaultValue?: MindMapDocument;
@@ -69,6 +79,7 @@ export interface MindMapEditorProps {
   viewport?: ViewportConfig;
   inspector?: InspectorConfig;
   search?: SearchConfig;
+  dragInteraction?: DragInteractionConfig;
   className?: string;
   renderNode?: (node: MindMapNode, selected: boolean) => ReactNode;
   onChange?: (document: MindMapDocument) => void;

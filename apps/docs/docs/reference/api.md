@@ -19,6 +19,7 @@
 ## Experimental
 
 - `renderNode`
+- `dragInteraction`
 - `ThemePanelConfig`
 - `NodeSizingConfig`
 - worker layout scheduler options

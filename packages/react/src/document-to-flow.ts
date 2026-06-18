@@ -2,6 +2,8 @@ import { getVisibleNodeIds } from "@my-mind-node/core";
 import type { MindMapDocument, MindMapNode, NodeId } from "@my-mind-node/core";
 import type { ReactNode } from "react";
 import type { Edge, Node } from "@xyflow/react";
+import type { DropIntent, MindNodeBranchSide } from "./drag-interactions";
+import type { MindNodeData } from "./nodes/MindNode";
 
 interface BranchPalette {
   node: string;
@@ -15,10 +17,21 @@ export interface FlowConversionOptions {
   selectedNodeIds?: NodeId[];
   highlightedNodeIds?: NodeId[];
   readonly?: boolean;
+  dropIntent?: DropIntent;
+  flashNodeId?: NodeId;
+  showAddChildControl?: boolean;
+  showCollapseControl?: boolean;
   onTitleCommit?: (nodeId: NodeId, title: string) => void;
   onEnterNodeView?: (nodeId: NodeId) => void;
   onResizeNode?: (nodeIds: NodeId[], delta: number) => void;
+  onAddChild?: (nodeId: NodeId) => void;
+  onToggleCollapse?: (nodeId: NodeId) => void;
   renderNode?: (node: MindMapNode, selected: boolean) => ReactNode;
+}
+
+export interface FlowConversionResult {
+  nodes: Array<Node<MindNodeData, "mindNode">>;
+  edges: Edge[];
 }
 
 const ROOT_PRESENTATION = {
@@ -111,7 +124,33 @@ function getTreeEdgeHandles(source: MindMapNode, target: MindMapNode) {
   return deltaX < 0 ? { sourceHandle: "source-left", targetHandle: "target-right" } : { sourceHandle: "source-right", targetHandle: "target-left" };
 }
 
-export function documentToFlow(document: MindMapDocument, options: FlowConversionOptions = {}) {
+function getLayoutBranchSide(direction: MindMapDocument["layout"]["direction"]): MindNodeBranchSide {
+  if (direction === "left") return "left";
+  if (direction === "up") return "up";
+  if (direction === "down") return "down";
+  return "right";
+}
+
+function getBranchSide(document: MindMapDocument, node: MindMapNode, viewRootId: NodeId): MindNodeBranchSide {
+  const metadataBranchSide = getMetadataString(node, "branchSide");
+  if (metadataBranchSide === "left" || metadataBranchSide === "right" || metadataBranchSide === "up" || metadataBranchSide === "down") {
+    return metadataBranchSide;
+  }
+  if (node.id === viewRootId) return getLayoutBranchSide(document.layout.direction);
+  const parent = node.parentId ? document.nodes[node.parentId] : undefined;
+  if (!parent) return getLayoutBranchSide(document.layout.direction);
+  if (document.layout.direction === "up" || document.layout.direction === "down") {
+    return node.position.y < parent.position.y ? "up" : "down";
+  }
+  return node.position.x < parent.position.x ? "left" : "right";
+}
+
+function getNodeDropIntent(intent: DropIntent | undefined, nodeId: NodeId): DropIntent | undefined {
+  if (!intent || intent.type === "none") return undefined;
+  return intent.targetId === nodeId ? intent : undefined;
+}
+
+export function documentToFlow(document: MindMapDocument, options: FlowConversionOptions = {}): FlowConversionResult {
   const viewRootId = options.viewRootId ?? document.rootId;
   const selected = new Set(options.selectedNodeIds ?? []);
   const highlighted = new Set(options.highlightedNodeIds ?? []);
@@ -126,7 +165,7 @@ export function documentToFlow(document: MindMapDocument, options: FlowConversio
     }),
   );
 
-  const nodes: Node[] = visibleIds.flatMap((nodeId) => {
+  const nodes: Array<Node<MindNodeData, "mindNode">> = visibleIds.flatMap((nodeId) => {
     const node = presentationNodes.get(nodeId);
     if (!node) return [];
     return {
@@ -137,10 +176,17 @@ export function documentToFlow(document: MindMapDocument, options: FlowConversio
       data: {
         node,
         highlighted: highlighted.has(node.id),
+        flash: options.flashNodeId === node.id,
         readonly: options.readonly,
+        branchSide: getBranchSide(document, node, viewRootId),
+        dropIntent: getNodeDropIntent(options.dropIntent, node.id),
+        showAddChildControl: options.showAddChildControl !== false && !node.collapsed,
+        showCollapseControl: options.showCollapseControl,
         onTitleCommit: options.onTitleCommit,
         onEnterNodeView: options.onEnterNodeView,
         onResizeNode: options.onResizeNode,
+        onAddChild: options.onAddChild,
+        onToggleCollapse: options.onToggleCollapse,
         renderNode: options.renderNode,
       },
     };

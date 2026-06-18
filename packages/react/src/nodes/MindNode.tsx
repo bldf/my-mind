@@ -1,16 +1,24 @@
 import { estimateLayoutNodeWidth, getNodeWidthOverride, type MindMapNode, type NodeId } from "@my-mind-node/core";
-import { Minus, MoveRight, Plus } from "lucide-react";
+import { ChevronLeft, ChevronRight, Minus, MoveRight, Plus } from "lucide-react";
 import { memo, useState } from "react";
 import type { ReactNode } from "react";
 import { Handle, Position, type NodeProps } from "@xyflow/react";
+import { getDropIntentLabel, type DropIntent, type MindNodeBranchSide } from "../drag-interactions";
 
 export interface MindNodeData extends Record<string, unknown> {
   node: MindMapNode;
   highlighted?: boolean;
+  flash?: boolean;
   readonly?: boolean;
+  branchSide?: MindNodeBranchSide;
+  dropIntent?: DropIntent;
+  showAddChildControl?: boolean;
+  showCollapseControl?: boolean;
   onTitleCommit?: (nodeId: NodeId, title: string) => void;
   onEnterNodeView?: (nodeId: NodeId) => void;
   onResizeNode?: (nodeIds: NodeId[], delta: number) => void;
+  onAddChild?: (nodeId: NodeId) => void;
+  onToggleCollapse?: (nodeId: NodeId) => void;
   renderNode?: (node: MindMapNode, selected: boolean) => ReactNode;
 }
 
@@ -24,6 +32,11 @@ export const MindNode = memo(function MindNode(props: NodeProps) {
   const node = data.node;
   const [draft, setDraft] = useState(node.title);
   const scale = node.style.scale ?? 1;
+  const dropLabel = data.dropIntent ? getDropIntentLabel(data.dropIntent) : undefined;
+  const canShowAddChild = !data.readonly && data.showAddChildControl !== false && Boolean(data.onAddChild);
+  const canShowCollapse =
+    !data.readonly && data.showCollapseControl !== false && node.children.length > 0 && Boolean(data.onToggleCollapse);
+  const collapseLabel = node.collapsed ? "Expand node" : "Collapse node";
 
   return (
     <div
@@ -31,6 +44,13 @@ export const MindNode = memo(function MindNode(props: NodeProps) {
         "mmn-node",
         props.selected ? "mmn-node--selected" : "",
         data.highlighted ? "mmn-node--highlighted" : "",
+        data.flash ? "mmn-node--drop-flash" : "",
+        data.branchSide ? `mmn-node--branch-${data.branchSide}` : "",
+        data.dropIntent?.type === "reparent" ? "mmn-node--drop-reparent" : "",
+        data.dropIntent?.type === "reparent" && data.dropIntent.armed ? "mmn-node--drop-armed" : "",
+        data.dropIntent?.type === "sort-before" ? "mmn-node--sort-before" : "",
+        data.dropIntent?.type === "sort-after" ? "mmn-node--sort-after" : "",
+        data.dropIntent?.type === "invalid" ? "mmn-node--drop-invalid" : "",
       ]
         .filter(Boolean)
         .join(" ")}
@@ -69,6 +89,49 @@ export const MindNode = memo(function MindNode(props: NodeProps) {
         />
       )}
       {node.task ? <span className="mmn-node__status">{node.task.status}</span> : null}
+      {dropLabel ? (
+        <span className="mmn-node__drop-label" role="status" aria-label={dropLabel}>
+          {dropLabel}
+        </span>
+      ) : null}
+      {data.dropIntent?.type === "sort-before" ? (
+        <span className="mmn-node__insert-line mmn-node__insert-line--before" role="status" aria-label="Insert before this node">
+          Before
+        </span>
+      ) : null}
+      {data.dropIntent?.type === "sort-after" ? (
+        <span className="mmn-node__insert-line mmn-node__insert-line--after" role="status" aria-label="Insert after this node">
+          After
+        </span>
+      ) : null}
+      {canShowAddChild ? (
+        <button
+          className="mmn-node__control mmn-node__control--add nodrag nopan"
+          type="button"
+          title="Add child"
+          aria-label={`Add child to ${node.title}`}
+          onClick={(event) => {
+            event.stopPropagation();
+            data.onAddChild?.(node.id);
+          }}
+        >
+          <Plus size={15} />
+        </button>
+      ) : null}
+      {canShowCollapse ? (
+        <button
+          className="mmn-node__control mmn-node__control--collapse nodrag nopan"
+          type="button"
+          title={collapseLabel}
+          aria-label={`${collapseLabel} ${node.title}`}
+          onClick={(event) => {
+            event.stopPropagation();
+            data.onToggleCollapse?.(node.id);
+          }}
+        >
+          {node.collapsed ? <ChevronRight size={15} /> : <ChevronLeft size={15} />}
+        </button>
+      ) : null}
       {props.selected && !data.readonly ? (
         <div className="mmn-node__quick" aria-label="Node size controls">
           <button type="button" title="Shrink node" aria-label="Shrink node" onClick={() => data.onResizeNode?.([node.id], -0.1)}>
