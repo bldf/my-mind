@@ -8,6 +8,9 @@ export default [
   {
     ignores: [
       "**/dist/**",
+      "**/.next/**",
+      "**/out/**",
+      "**/next-env.d.ts",
       "**/.vitepress/.temp/**",
       "**/.vitepress/cache/**",
       "**/.vitepress/dist/**",
@@ -50,7 +53,10 @@ export default [
     rules: {
       ...reactHooks.configs.recommended.rules,
       "no-unused-vars": "off",
-      "@typescript-eslint/no-unused-vars": ["error", { "argsIgnorePattern": "^_", "varsIgnorePattern": "^_" }],
+      "@typescript-eslint/no-unused-vars": [
+        "error",
+        { argsIgnorePattern: "^_", varsIgnorePattern: "^_" },
+      ],
     },
   },
 ];

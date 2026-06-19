@@ -1,10 +1,24 @@
 import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { asNodeId, createEmptyDocument, createNode, type MindMapDocument, type MindMapNode } from "@my-mind-node/core";
-import { getDropIntentLabel, getDropValidationReason, getSortInsertionIndex, getTopLevelMovableNodeIds } from "../drag-interactions";
+import {
+  asNodeId,
+  createEmptyDocument,
+  createNode,
+  type MindMapDocument,
+  type MindMapNode,
+} from "@my-mind-node/core";
+import { ReactFlowProvider, type NodeProps } from "@xyflow/react";
+import {
+  getDropGeometry,
+  getDropIntentLabel,
+  getDropValidationReason,
+  getSortInsertionIndex,
+  getTopLevelMovableNodeIds,
+} from "../drag-interactions";
 import { documentToFlow } from "../document-to-flow";
 import { MindMapEditor } from "../MindMapEditor";
 import { MindMapViewer } from "../MindMapViewer";
+import { MindNode, type MindNodeData } from "../nodes/MindNode";
 import { OutlineEditor } from "../OutlineEditor";
 
 afterEach(() => cleanup());
@@ -16,8 +30,27 @@ function createDocumentWithRootChildren(): MindMapDocument {
   const secondId = asNodeId("second");
   root.children = [firstId, secondId];
   document.nodes[firstId] = createNode({ id: firstId, parentId: document.rootId, title: "First" });
-  document.nodes[secondId] = createNode({ id: secondId, parentId: document.rootId, title: "Second" });
+  document.nodes[secondId] = createNode({
+    id: secondId,
+    parentId: document.rootId,
+    title: "Second",
+  });
   return document;
+}
+
+function renderMindNode(data: MindNodeData, selected = false) {
+  const props = {
+    id: String(data.node.id),
+    type: "mindNode",
+    selected,
+    data,
+  } as unknown as NodeProps;
+
+  return render(
+    <ReactFlowProvider>
+      <MindNode {...props} />
+    </ReactFlowProvider>,
+  );
 }
 
 describe("@my-mind-node/react", () => {
@@ -64,23 +97,145 @@ describe("@my-mind-node/react", () => {
     const document = createDocumentWithRootChildren();
     document.nodes.first!.collapsed = true;
     document.nodes.first!.children = [asNodeId("hidden")];
-    document.nodes.hidden = createNode({ id: asNodeId("hidden"), parentId: asNodeId("first"), title: "Hidden child" });
+    document.nodes.hidden = createNode({
+      id: asNodeId("hidden"),
+      parentId: asNodeId("first"),
+      title: "Hidden child",
+    });
     const flow = documentToFlow(document, { showAddChildControl: true });
     const collapsed = flow.nodes.find((node) => node.id === "first")!;
 
     expect(collapsed.data.showAddChildControl).toBe(false);
   });
 
+  it("counts all hidden descendants for collapsed visible nodes", () => {
+    const document = createDocumentWithRootChildren();
+    const childId = asNodeId("hidden-child");
+    const grandchildId = asNodeId("hidden-grandchild");
+    document.nodes.first!.collapsed = true;
+    document.nodes.first!.children = [childId];
+    document.nodes[childId] = createNode({
+      id: childId,
+      parentId: asNodeId("first"),
+      title: "Hidden child",
+      children: [grandchildId],
+    });
+    document.nodes[grandchildId] = createNode({
+      id: grandchildId,
+      parentId: childId,
+      title: "Hidden grandchild",
+    });
+
+    const flow = documentToFlow(document);
+    const collapsed = flow.nodes.find((node) => node.id === "first")!;
+
+    expect(collapsed.data.collapsedHiddenCount).toBe(2);
+    expect(flow.nodes.some((node) => node.id === "hidden-child")).toBe(false);
+  });
+
+  it("renders collapsed hidden counts as the expand entry without a duplicate hover expand button", () => {
+    const node = createNode({
+      id: asNodeId("first"),
+      title: "First",
+      collapsed: true,
+      children: [asNodeId("child")],
+    });
+    const onExpandCollapsed = vi.fn();
+    const onToggleCollapse = vi.fn();
+
+    renderMindNode({ node, collapsedHiddenCount: 2, onExpandCollapsed, onToggleCollapse });
+
+    fireEvent.click(screen.getByRole("button", { name: "Expand First, 2 hidden nodes" }));
+    expect(onExpandCollapsed).toHaveBeenCalledWith(asNodeId("first"));
+    expect(screen.queryByRole("button", { name: "Expand node First" })).toBeNull();
+  });
+
+  it("shows readonly collapsed counts as non-mutating status text", () => {
+    const node = createNode({
+      id: asNodeId("first"),
+      title: "First",
+      collapsed: true,
+      children: [asNodeId("child")],
+    });
+
+    renderMindNode({ node, readonly: true, collapsedHiddenCount: 2, onExpandCollapsed: vi.fn() });
+
+    expect(screen.getByLabelText("First has 2 hidden nodes")).toBeTruthy();
+    expect(screen.queryByRole("button", { name: "Expand First, 2 hidden nodes" })).toBeNull();
+  });
+
   it("exposes drag flash settings to CSS animations", () => {
     const document = createDocumentWithRootChildren();
-    const { container } = render(<MindMapEditor value={document} dragInteraction={{ reparentDwellMs: 1234, flashDurationMs: 456 }} />);
+    const { container } = render(
+      <MindMapEditor
+        value={document}
+        dragInteraction={{ reparentDwellMs: 1234, flashDurationMs: 456 }}
+      />,
+    );
     const editor = container.querySelector<HTMLElement>(".mmn-editor")!;
 
     expect(editor.style.getPropertyValue("--mmn-drop-flash-duration")).toBe("456ms");
   });
 
   it("describes center drop as immediate child movement", () => {
-    expect(getDropIntentLabel({ type: "reparent", targetId: asNodeId("target") })).toBe("Drop to add as child");
+    expect(getDropIntentLabel({ type: "reparent", targetId: asNodeId("target") })).toBe(
+      "Drop to add as child",
+    );
+  });
+
+  it("separates overlap reparenting from outside before and after sort zones", () => {
+    const targetRect = { left: 100, top: 100, right: 200, bottom: 150, width: 100, height: 50 };
+    const base = {
+      targetRect,
+      layoutDirection: "right" as const,
+      sortGapPx: 48,
+      overlapRatio: 0.3,
+    };
+
+    expect(
+      getDropGeometry({
+        ...base,
+        movingRect: { left: 120, top: 108, right: 180, bottom: 148, width: 60, height: 40 },
+      }).type,
+    ).toBe("reparent");
+    expect(
+      getDropGeometry({
+        ...base,
+        movingRect: { left: 120, top: 64, right: 180, bottom: 104, width: 60, height: 40 },
+      }).type,
+    ).toBe("sort-before");
+    expect(
+      getDropGeometry({
+        ...base,
+        movingRect: { left: 120, top: 146, right: 180, bottom: 186, width: 60, height: 40 },
+      }).type,
+    ).toBe("sort-after");
+    expect(
+      getDropGeometry({
+        ...base,
+        movingRect: { left: 260, top: 64, right: 320, bottom: 104, width: 60, height: 40 },
+      }).type,
+    ).toBe("none");
+  });
+
+  it("renders selected node resize handles without the old bottom shrink and grow buttons", () => {
+    const node = createNode({ id: asNodeId("first"), title: "First" });
+    const onResizeNode = vi.fn();
+
+    renderMindNode({ node, onResizeNode, nodeResizeStep: 0.2 }, true);
+
+    expect(screen.getAllByRole("button", { name: /^Resize First from/ })).toHaveLength(4);
+    expect(screen.queryByRole("button", { name: "Shrink node" })).toBeNull();
+    expect(screen.queryByRole("button", { name: "Grow node" })).toBeNull();
+
+    fireEvent.keyDown(screen.getByRole("button", { name: "Resize First from top left" }), {
+      key: "ArrowLeft",
+    });
+    fireEvent.keyDown(screen.getByRole("button", { name: "Resize First from top left" }), {
+      key: "Enter",
+    });
+    expect(onResizeNode).toHaveBeenNthCalledWith(1, [asNodeId("first")], -0.2);
+    expect(onResizeNode).toHaveBeenNthCalledWith(2, [asNodeId("first")], 0.2);
   });
 
   it("assigns automatic branch colors without overriding custom node colors", () => {
@@ -108,10 +263,13 @@ describe("@my-mind-node/react", () => {
     });
 
     const flow = documentToFlow(document);
-    const getFlowNode = (id: string) => flow.nodes.find((node) => node.id === id)!.data.node as MindMapNode;
+    const getFlowNode = (id: string) =>
+      flow.nodes.find((node) => node.id === id)!.data.node as MindMapNode;
 
     expect(getFlowNode("first").style.backgroundColor).toBeTruthy();
-    expect(getFlowNode("first").style.backgroundColor).not.toBe(getFlowNode("second").style.backgroundColor);
+    expect(getFlowNode("first").style.backgroundColor).not.toBe(
+      getFlowNode("second").style.backgroundColor,
+    );
     expect(getFlowNode("custom").style.backgroundColor).toBe("#123456");
     expect(getFlowNode("custom").style.borderColor).toBe("#654321");
     expect(getFlowNode("custom").style.color).toBe("#f8fafc");
@@ -135,12 +293,24 @@ describe("@my-mind-node/react", () => {
     const document = createDocumentWithRootChildren();
     const childId = asNodeId("child");
     document.nodes.first!.children = [childId];
-    document.nodes[childId] = createNode({ id: childId, parentId: asNodeId("first"), title: "Child" });
+    document.nodes[childId] = createNode({
+      id: childId,
+      parentId: asNodeId("first"),
+      title: "Child",
+    });
 
-    expect(getTopLevelMovableNodeIds(document, [asNodeId("first"), childId])).toEqual([asNodeId("first")]);
-    expect(getDropValidationReason(document, [asNodeId("first")], childId, "reparent")).toMatch(/descendant/);
-    expect(getSortInsertionIndex(document, asNodeId("second"), [asNodeId("first")], "before")).toBe(0);
-    expect(getSortInsertionIndex(document, asNodeId("second"), [asNodeId("first")], "after")).toBe(1);
+    expect(getTopLevelMovableNodeIds(document, [asNodeId("first"), childId])).toEqual([
+      asNodeId("first"),
+    ]);
+    expect(getDropValidationReason(document, [asNodeId("first")], childId, "reparent")).toMatch(
+      /descendant/,
+    );
+    expect(getSortInsertionIndex(document, asNodeId("second"), [asNodeId("first")], "before")).toBe(
+      0,
+    );
+    expect(getSortInsertionIndex(document, asNodeId("second"), [asNodeId("first")], "after")).toBe(
+      1,
+    );
   });
 
   it("preserves newline titles from the node title editor", () => {

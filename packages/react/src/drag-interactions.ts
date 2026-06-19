@@ -1,4 +1,9 @@
-import { getAncestorIds, getDescendantIds, type MindMapDocument, type NodeId } from "@my-mind-node/core";
+import {
+  getAncestorIds,
+  getDescendantIds,
+  type MindMapDocument,
+  type NodeId,
+} from "@my-mind-node/core";
 
 export type DropIntent =
   | { type: "none" }
@@ -9,16 +14,149 @@ export type DropIntent =
 
 export type DropMode = "reparent" | "sort";
 export type DropZone = "before" | "center" | "after";
+export type DropGeometryIntent = "reparent" | "sort-before" | "sort-after" | "none";
 export type MindNodeBranchSide = "left" | "right" | "up" | "down";
 
 export const EMPTY_DROP_INTENT: DropIntent = { type: "none" };
 
-export function getDropZone(clientY: number, top: number, height: number, sortZoneRatio: number): DropZone {
+export interface DropRect {
+  left: number;
+  top: number;
+  right: number;
+  bottom: number;
+  width: number;
+  height: number;
+}
+
+export interface DropGeometryInput {
+  movingRect: DropRect;
+  targetRect: DropRect;
+  layoutDirection: MindMapDocument["layout"]["direction"];
+  sortGapPx: number;
+  overlapRatio: number;
+}
+
+export interface DropGeometryResult {
+  type: DropGeometryIntent;
+  distance: number;
+}
+
+export function getDropZone(
+  clientY: number,
+  top: number,
+  height: number,
+  sortZoneRatio: number,
+): DropZone {
   const ratio = Math.min(0.45, Math.max(0.12, sortZoneRatio));
   const offset = height <= 0 ? 0.5 : (clientY - top) / height;
   if (offset < ratio) return "before";
   if (offset > 1 - ratio) return "after";
   return "center";
+}
+
+function getRectCenter(rect: DropRect) {
+  return {
+    x: rect.left + rect.width / 2,
+    y: rect.top + rect.height / 2,
+  };
+}
+
+function containsPoint(rect: DropRect, point: { x: number; y: number }): boolean {
+  return (
+    point.x >= rect.left && point.x <= rect.right && point.y >= rect.top && point.y <= rect.bottom
+  );
+}
+
+function getIntersectionArea(first: DropRect, second: DropRect): number {
+  const width = Math.max(
+    0,
+    Math.min(first.right, second.right) - Math.max(first.left, second.left),
+  );
+  const height = Math.max(
+    0,
+    Math.min(first.bottom, second.bottom) - Math.max(first.top, second.top),
+  );
+  return width * height;
+}
+
+function getOverlapRatio(first: DropRect, second: DropRect): number {
+  const smallestArea = Math.max(
+    1,
+    Math.min(first.width * first.height, second.width * second.height),
+  );
+  return getIntersectionArea(first, second) / smallestArea;
+}
+
+function getSortGap(sortGapPx: number): number {
+  return Math.max(8, sortGapPx);
+}
+
+function isVerticalSiblingAxis(direction: MindMapDocument["layout"]["direction"]): boolean {
+  return direction === "left" || direction === "right";
+}
+
+function getCrossAxisOverlapRatio(
+  firstStart: number,
+  firstEnd: number,
+  secondStart: number,
+  secondEnd: number,
+): number {
+  const overlap = Math.max(0, Math.min(firstEnd, secondEnd) - Math.max(firstStart, secondStart));
+  const shortest = Math.max(1, Math.min(firstEnd - firstStart, secondEnd - secondStart));
+  return overlap / shortest;
+}
+
+export function getDropGeometry(input: DropGeometryInput): DropGeometryResult {
+  const movingCenter = getRectCenter(input.movingRect);
+  const targetCenter = getRectCenter(input.targetRect);
+  const overlapRatio = getOverlapRatio(input.movingRect, input.targetRect);
+  if (containsPoint(input.targetRect, movingCenter) || overlapRatio >= input.overlapRatio) {
+    return {
+      type: "reparent",
+      distance: Math.hypot(movingCenter.x - targetCenter.x, movingCenter.y - targetCenter.y),
+    };
+  }
+
+  const sortGap = getSortGap(input.sortGapPx);
+  if (isVerticalSiblingAxis(input.layoutDirection)) {
+    const crossAxisOverlap = getCrossAxisOverlapRatio(
+      input.movingRect.left,
+      input.movingRect.right,
+      input.targetRect.left,
+      input.targetRect.right,
+    );
+    if (crossAxisOverlap < 0.35) return { type: "none", distance: Number.POSITIVE_INFINITY };
+
+    const beforeDistance = input.targetRect.top - movingCenter.y;
+    if (beforeDistance > 0 && beforeDistance <= sortGap) {
+      return { type: "sort-before", distance: beforeDistance };
+    }
+
+    const afterDistance = movingCenter.y - input.targetRect.bottom;
+    if (afterDistance > 0 && afterDistance <= sortGap) {
+      return { type: "sort-after", distance: afterDistance };
+    }
+  } else {
+    const crossAxisOverlap = getCrossAxisOverlapRatio(
+      input.movingRect.top,
+      input.movingRect.bottom,
+      input.targetRect.top,
+      input.targetRect.bottom,
+    );
+    if (crossAxisOverlap < 0.35) return { type: "none", distance: Number.POSITIVE_INFINITY };
+
+    const beforeDistance = input.targetRect.left - movingCenter.x;
+    if (beforeDistance > 0 && beforeDistance <= sortGap) {
+      return { type: "sort-before", distance: beforeDistance };
+    }
+
+    const afterDistance = movingCenter.x - input.targetRect.right;
+    if (afterDistance > 0 && afterDistance <= sortGap) {
+      return { type: "sort-after", distance: afterDistance };
+    }
+  }
+
+  return { type: "none", distance: Number.POSITIVE_INFINITY };
 }
 
 function getDocumentOrder(document: MindMapDocument): NodeId[] {
@@ -40,7 +178,9 @@ export function getTopLevelMovableNodeIds(document: MindMapDocument, nodeIds: No
     return !uniqueNodeIds.some((otherId) => ancestors.includes(otherId));
   });
   const order = new Map(getDocumentOrder(document).map((nodeId, index) => [nodeId, index]));
-  return topLevelNodeIds.sort((a, b) => (order.get(a) ?? Number.MAX_SAFE_INTEGER) - (order.get(b) ?? Number.MAX_SAFE_INTEGER));
+  return topLevelNodeIds.sort(
+    (a, b) => (order.get(a) ?? Number.MAX_SAFE_INTEGER) - (order.get(b) ?? Number.MAX_SAFE_INTEGER),
+  );
 }
 
 export function getDropValidationReason(

@@ -26,6 +26,9 @@ export interface FlowConversionOptions {
   onResizeNode?: (nodeIds: NodeId[], delta: number) => void;
   onAddChild?: (nodeId: NodeId) => void;
   onToggleCollapse?: (nodeId: NodeId) => void;
+  onExpandCollapsed?: (nodeId: NodeId) => void;
+  showNodeResizeControls?: boolean;
+  nodeResizeStep?: number;
   renderNode?: (node: MindMapNode, selected: boolean) => ReactNode;
 }
 
@@ -78,7 +81,10 @@ function getMetadataString(node: MindMapNode, key: string): string | undefined {
   return typeof value === "string" ? value : undefined;
 }
 
-function getBranchPaletteByNodeId(document: MindMapDocument, viewRootId: NodeId): Map<NodeId, BranchPalette> {
+function getBranchPaletteByNodeId(
+  document: MindMapDocument,
+  viewRootId: NodeId,
+): Map<NodeId, BranchPalette> {
   const result = new Map<NodeId, BranchPalette>();
   const viewRoot = document.nodes[viewRootId];
   if (!viewRoot) return result;
@@ -91,21 +97,34 @@ function getBranchPaletteByNodeId(document: MindMapDocument, viewRootId: NodeId)
     for (const childId of node.children) paint(childId, palette);
   };
 
-  viewRoot.children.forEach((childId, index) => paint(childId, AUTO_BRANCH_PALETTES[index % AUTO_BRANCH_PALETTES.length]!));
+  viewRoot.children.forEach((childId, index) =>
+    paint(childId, AUTO_BRANCH_PALETTES[index % AUTO_BRANCH_PALETTES.length]!),
+  );
   return result;
 }
 
-function applyDefaultPresentation(node: MindMapNode, palette: BranchPalette | undefined, isViewRoot: boolean): MindMapNode {
+function applyDefaultPresentation(
+  node: MindMapNode,
+  palette: BranchPalette | undefined,
+  isViewRoot: boolean,
+): MindMapNode {
   const style = {
     ...node.style,
-    backgroundColor: node.style.backgroundColor ?? (isViewRoot ? ROOT_PRESENTATION.backgroundColor : palette?.node),
-    borderColor: node.style.borderColor ?? (isViewRoot ? ROOT_PRESENTATION.borderColor : palette?.border),
+    backgroundColor:
+      node.style.backgroundColor ??
+      (isViewRoot ? ROOT_PRESENTATION.backgroundColor : palette?.node),
+    borderColor:
+      node.style.borderColor ?? (isViewRoot ? ROOT_PRESENTATION.borderColor : palette?.border),
     color: node.style.color ?? (isViewRoot ? ROOT_PRESENTATION.color : palette?.text),
     fontWeight: node.style.fontWeight ?? (isViewRoot ? "bold" : palette ? "medium" : undefined),
   };
 
-  const shouldAddBranchEdgeColor = Boolean(palette && !node.style.borderColor && !getMetadataString(node, "branchEdgeColor"));
-  const metadata = shouldAddBranchEdgeColor ? { ...node.metadata, branchEdgeColor: palette!.edge } : node.metadata;
+  const shouldAddBranchEdgeColor = Boolean(
+    palette && !node.style.borderColor && !getMetadataString(node, "branchEdgeColor"),
+  );
+  const metadata = shouldAddBranchEdgeColor
+    ? { ...node.metadata, branchEdgeColor: palette!.edge }
+    : node.metadata;
 
   return {
     ...node,
@@ -115,25 +134,43 @@ function applyDefaultPresentation(node: MindMapNode, palette: BranchPalette | un
 }
 
 function getEdgeColor(source: MindMapNode, target: MindMapNode): string | undefined {
-  return getMetadataString(target, "branchEdgeColor") ?? getMetadataString(source, "branchEdgeColor") ?? target.style.borderColor ?? source.style.borderColor;
+  return (
+    getMetadataString(target, "branchEdgeColor") ??
+    getMetadataString(source, "branchEdgeColor") ??
+    target.style.borderColor ??
+    source.style.borderColor
+  );
 }
 
 function getTreeEdgeHandles(source: MindMapNode, target: MindMapNode) {
   const deltaX = target.position.x - source.position.x;
 
-  return deltaX < 0 ? { sourceHandle: "source-left", targetHandle: "target-right" } : { sourceHandle: "source-right", targetHandle: "target-left" };
+  return deltaX < 0
+    ? { sourceHandle: "source-left", targetHandle: "target-right" }
+    : { sourceHandle: "source-right", targetHandle: "target-left" };
 }
 
-function getLayoutBranchSide(direction: MindMapDocument["layout"]["direction"]): MindNodeBranchSide {
+function getLayoutBranchSide(
+  direction: MindMapDocument["layout"]["direction"],
+): MindNodeBranchSide {
   if (direction === "left") return "left";
   if (direction === "up") return "up";
   if (direction === "down") return "down";
   return "right";
 }
 
-function getBranchSide(document: MindMapDocument, node: MindMapNode, viewRootId: NodeId): MindNodeBranchSide {
+function getBranchSide(
+  document: MindMapDocument,
+  node: MindMapNode,
+  viewRootId: NodeId,
+): MindNodeBranchSide {
   const metadataBranchSide = getMetadataString(node, "branchSide");
-  if (metadataBranchSide === "left" || metadataBranchSide === "right" || metadataBranchSide === "up" || metadataBranchSide === "down") {
+  if (
+    metadataBranchSide === "left" ||
+    metadataBranchSide === "right" ||
+    metadataBranchSide === "up" ||
+    metadataBranchSide === "down"
+  ) {
     return metadataBranchSide;
   }
   if (node.id === viewRootId) return getLayoutBranchSide(document.layout.direction);
@@ -150,7 +187,26 @@ function getNodeDropIntent(intent: DropIntent | undefined, nodeId: NodeId): Drop
   return intent.targetId === nodeId ? intent : undefined;
 }
 
-export function documentToFlow(document: MindMapDocument, options: FlowConversionOptions = {}): FlowConversionResult {
+function countDescendants(document: MindMapDocument, nodeId: NodeId): number {
+  const node = document.nodes[nodeId];
+  if (!node) return 0;
+  return node.children.reduce(
+    (total, childId) =>
+      total + (document.nodes[childId] ? 1 + countDescendants(document, childId) : 0),
+    0,
+  );
+}
+
+function getCollapsedHiddenCount(document: MindMapDocument, node: MindMapNode): number | undefined {
+  if (!node.collapsed) return undefined;
+  const count = countDescendants(document, node.id);
+  return count > 0 ? count : undefined;
+}
+
+export function documentToFlow(
+  document: MindMapDocument,
+  options: FlowConversionOptions = {},
+): FlowConversionResult {
   const viewRootId = options.viewRootId ?? document.rootId;
   const selected = new Set(options.selectedNodeIds ?? []);
   const highlighted = new Set(options.highlightedNodeIds ?? []);
@@ -161,7 +217,12 @@ export function documentToFlow(document: MindMapDocument, options: FlowConversio
     visibleIds.flatMap((nodeId) => {
       const node = document.nodes[nodeId];
       if (!node) return [];
-      return [[nodeId, applyDefaultPresentation(node, branchPaletteByNodeId.get(nodeId), nodeId === viewRootId)]];
+      return [
+        [
+          nodeId,
+          applyDefaultPresentation(node, branchPaletteByNodeId.get(nodeId), nodeId === viewRootId),
+        ],
+      ];
     }),
   );
 
@@ -180,13 +241,17 @@ export function documentToFlow(document: MindMapDocument, options: FlowConversio
         readonly: options.readonly,
         branchSide: getBranchSide(document, node, viewRootId),
         dropIntent: getNodeDropIntent(options.dropIntent, node.id),
+        collapsedHiddenCount: getCollapsedHiddenCount(document, node),
         showAddChildControl: options.showAddChildControl !== false && !node.collapsed,
         showCollapseControl: options.showCollapseControl,
+        showNodeResizeControls: options.showNodeResizeControls,
+        nodeResizeStep: options.nodeResizeStep,
         onTitleCommit: options.onTitleCommit,
         onEnterNodeView: options.onEnterNodeView,
         onResizeNode: options.onResizeNode,
         onAddChild: options.onAddChild,
         onToggleCollapse: options.onToggleCollapse,
+        onExpandCollapsed: options.onExpandCollapsed,
         renderNode: options.renderNode,
       },
     };
@@ -216,7 +281,9 @@ export function documentToFlow(document: MindMapDocument, options: FlowConversio
   });
 
   const connectionEdges: Edge[] = document.connections
-    .filter((connection) => visibleSet.has(connection.sourceId) && visibleSet.has(connection.targetId))
+    .filter(
+      (connection) => visibleSet.has(connection.sourceId) && visibleSet.has(connection.targetId),
+    )
     .flatMap((connection) => {
       const source = presentationNodes.get(connection.sourceId);
       const target = presentationNodes.get(connection.targetId);
