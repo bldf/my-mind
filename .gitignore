@@ -2,6 +2,8 @@ node_modules/
 .corepack/
 .pnpm-home/
 dist/
+out/
+.next/
 .vite/
 **/.vitepress/cache/
 **/.vitepress/dist/
