@@ -1,0 +1,4 @@
+interface:
+  display_name: "My AI Auto Dev"
+  short_description: "Execute specs through a feature workflow"
+  default_prompt: "Use $my-ai-auto-dev to execute specs across one or more code projects."

@@ -1,0 +1,4 @@
+interface:
+  display_name: "My AI Init"
+  short_description: "Initialize Antigravity project guidance"
+  default_prompt: "Use $my-ai-init to create or refresh Antigravity project guidance."

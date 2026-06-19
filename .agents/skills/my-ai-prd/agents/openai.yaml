@@ -1,0 +1,4 @@
+interface:
+  display_name: "My AI PRD"
+  short_description: "Generate feature specs from requirements"
+  default_prompt: "Use $my-ai-prd to generate development specs from requirement documents."
