@@ -35,6 +35,22 @@ describe("@my-mind-node/core", () => {
     expect(Object.keys(result.document.nodes)).toHaveLength(2);
   });
 
+  it("does not record operations for idempotent node updates", () => {
+    const document = createEmptyDocument({ rootTitle: "Root" });
+    const result = dispatchCommand(document, {
+      type: "node.update",
+      nodeId: document.rootId,
+      patch: { title: "Root" },
+    });
+
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    expect(result.operation).toBeUndefined();
+    expect(result.document).toBe(document);
+    expect(result.document.revision).toBe(document.revision);
+    expect(result.document.nodes[document.rootId]?.title).toBe("Root");
+  });
+
   it("imports and exports indented text", () => {
     const imported = importIndentedText("Alpha\n  Beta\nGamma");
     expect(imported.ok).toBe(true);

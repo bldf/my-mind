@@ -270,6 +270,59 @@ test("selected node uses corner resize handles instead of bottom shrink and grow
     .toBeGreaterThan(beforeScale);
 });
 
+test("dragging corner resize handle scales the node 1:1 and commits once", async ({
+  page,
+  isMobile,
+}) => {
+  test.skip(
+    isMobile,
+    "Desktop mouse resize dragging is covered separately from mobile touch basics.",
+  );
+
+  await page.goto("/");
+  const node = page.locator('.react-flow__node[data-id="node-1"]');
+  const renderedNode = page.locator('.mmn-node[data-node-id="node-1"]');
+  await node.click();
+
+  const handle = node.getByRole("button", { name: "Resize Topic 1 from bottom right" });
+  await expect(handle).toBeVisible();
+
+  const box = await handle.boundingBox();
+  const beforeBox = await renderedNode.boundingBox();
+  if (!box) throw new Error("Resize handle bounding box is not found");
+  if (!beforeBox) throw new Error("Node bounding box is not found");
+
+  const startX = box.x + box.width / 2;
+  const startY = box.y + box.height / 2;
+  const beforeScale = (await getPlaygroundDocument(page)).nodes["node-1"]?.style?.scale ?? 1;
+
+  await page.mouse.move(startX, startY);
+  await page.mouse.down();
+  await page.mouse.move(startX + 50, startY + 50, { steps: 10 });
+  await expect
+    .poll(async () => (await renderedNode.boundingBox())?.width ?? 0)
+    .toBeGreaterThan(beforeBox.width);
+  expect((await getPlaygroundDocument(page)).nodes["node-1"]?.style?.scale ?? 1).toBe(
+    beforeScale,
+  );
+  await page.mouse.up();
+
+  await expect
+    .poll(async () => (await getPlaygroundDocument(page)).nodes["node-1"]?.style?.scale ?? 1)
+    .toBeGreaterThan(beforeScale);
+
+  await page.locator(".mmn-editor").focus();
+  await expect
+    .poll(async () =>
+      page.locator(".mmn-editor").evaluate((element) => document.activeElement === element),
+    )
+    .toBe(true);
+  await page.keyboard.press("Control+Z");
+  await expect
+    .poll(async () => (await getPlaygroundDocument(page)).nodes["node-1"]?.style?.scale ?? 1)
+    .toBe(beforeScale);
+});
+
 test("multiline and long titles are saved and keep the root fully visible", async ({
   page,
   isMobile,

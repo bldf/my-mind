@@ -23,6 +23,14 @@ import { OutlineEditor } from "../OutlineEditor";
 
 afterEach(() => cleanup());
 
+if (typeof window.PointerEvent === "undefined") {
+  Object.defineProperty(window, "PointerEvent", {
+    configurable: true,
+    writable: true,
+    value: MouseEvent as unknown as typeof PointerEvent,
+  });
+}
+
 function createDocumentWithRootChildren(): MindMapDocument {
   const document = createEmptyDocument({ rootTitle: "Root" });
   const root = document.nodes[document.rootId]!;
@@ -324,5 +332,79 @@ describe("@my-mind-node/react", () => {
 
     const nextDocument = onChange.mock.calls.at(-1)?.[0] as MindMapDocument;
     expect(nextDocument.nodes[nextDocument.rootId]!.title).toBe("Line one\nLine two");
+  });
+
+  it("handles continuous 1:1 dragging and commits the scale value on release", () => {
+    const node = createNode({ id: asNodeId("first"), title: "First" });
+    const onResizeProgress = vi.fn();
+    const onResizeCommit = vi.fn();
+
+    renderMindNode({
+      node,
+      onResizeProgress,
+      onResizeCommit,
+      nodeMinScale: 0.5,
+      nodeMaxScale: 2.0,
+      nodeResizeStep: 0.1,
+    }, true);
+
+    const handle = screen.getByRole("button", { name: "Resize First from top left" });
+
+    const nodeElement = handle.closest(".mmn-node")!;
+    nodeElement.getBoundingClientRect = () => ({
+      left: 100,
+      top: 100,
+      width: 100,
+      height: 100,
+      right: 200,
+      bottom: 200,
+      x: 100,
+      y: 100,
+      toJSON: () => {},
+    });
+
+    fireEvent.pointerDown(handle, { clientX: 100, clientY: 100 });
+    fireEvent(window, new PointerEvent("pointermove", { clientX: 50, clientY: 50 }));
+
+    expect(onResizeProgress).toHaveBeenCalledWith(asNodeId("first"), 2.0);
+
+    fireEvent(window, new PointerEvent("pointerup"));
+    expect(onResizeCommit).toHaveBeenCalledWith(asNodeId("first"), 2.0);
+  });
+
+  it("commits a single step increase on a simple click click/pointerup without movement", () => {
+    const node = createNode({ id: asNodeId("first"), title: "First" });
+    const onResizeProgress = vi.fn();
+    const onResizeCommit = vi.fn();
+
+    renderMindNode({
+      node,
+      onResizeProgress,
+      onResizeCommit,
+      nodeMinScale: 0.5,
+      nodeMaxScale: 2.0,
+      nodeResizeStep: 0.15,
+    }, true);
+
+    const handle = screen.getByRole("button", { name: "Resize First from top left" });
+
+    const nodeElement = handle.closest(".mmn-node")!;
+    nodeElement.getBoundingClientRect = () => ({
+      left: 100,
+      top: 100,
+      width: 100,
+      height: 100,
+      right: 200,
+      bottom: 200,
+      x: 100,
+      y: 100,
+      toJSON: () => {},
+    });
+
+    fireEvent.pointerDown(handle, { clientX: 100, clientY: 100 });
+    fireEvent(window, new PointerEvent("pointerup"));
+
+    expect(onResizeProgress).not.toHaveBeenCalled();
+    expect(onResizeCommit).toHaveBeenCalledWith(asNodeId("first"), 1.15);
   });
 });

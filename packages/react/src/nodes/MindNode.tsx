@@ -29,9 +29,13 @@ export interface MindNodeData extends Record<string, unknown> {
   showCollapseControl?: boolean;
   showNodeResizeControls?: boolean;
   nodeResizeStep?: number;
+  nodeMinScale?: number;
+  nodeMaxScale?: number;
   onTitleCommit?: (nodeId: NodeId, title: string) => void;
   onEnterNodeView?: (nodeId: NodeId) => void;
   onResizeNode?: (nodeIds: NodeId[], delta: number) => void;
+  onResizeProgress?: (nodeId: NodeId, scale: number) => void;
+  onResizeCommit?: (nodeId: NodeId, scale: number) => void;
   onAddChild?: (nodeId: NodeId) => void;
   onToggleCollapse?: (nodeId: NodeId) => void;
   onExpandCollapsed?: (nodeId: NodeId) => void;
@@ -41,7 +45,6 @@ export interface MindNodeData extends Record<string, unknown> {
 type ResizeCorner = "top-left" | "top-right" | "bottom-left" | "bottom-right";
 
 const RESIZE_CORNERS: ResizeCorner[] = ["top-left", "top-right", "bottom-left", "bottom-right"];
-const RESIZE_PIXEL_STEP = 18;
 
 function getNodeWidth(node: MindMapNode, readonly: boolean): number | undefined {
   if (readonly && getNodeWidthOverride(node) === undefined) return undefined;
@@ -107,7 +110,7 @@ export const MindNode = memo(function MindNode(props: NodeProps) {
     props.selected &&
     !data.readonly &&
     data.showNodeResizeControls !== false &&
-    Boolean(data.onResizeNode);
+    (Boolean(data.onResizeNode) || Boolean(data.onResizeCommit));
   const collapseLabel = node.collapsed ? "Expand node" : "Collapse node";
   const resizeStep = data.nodeResizeStep ?? 0.1;
 
@@ -139,12 +142,16 @@ export const MindNode = memo(function MindNode(props: NodeProps) {
 
       resizeCleanup.current?.();
 
+      const startScale = node.style.scale ?? 1;
       const center = getElementCenter(nodeElement);
       const startDistance = getDistanceToPoint(event.clientX, event.clientY, center);
       const startX = event.clientX;
       const startY = event.clientY;
-      let appliedSteps = 0;
+      const minScale = data.nodeMinScale ?? 0.5;
+      const maxScale = data.nodeMaxScale ?? 2.0;
+
       let moved = false;
+      let currentScale = startScale;
 
       const cleanup = () => {
         ownerWindow.removeEventListener("pointermove", onPointerMove);
@@ -156,24 +163,30 @@ export const MindNode = memo(function MindNode(props: NodeProps) {
       const onPointerMove = (moveEvent: PointerEvent) => {
         moveEvent.preventDefault();
         moveEvent.stopPropagation();
-        if (Math.hypot(moveEvent.clientX - startX, moveEvent.clientY - startY) > 3) moved = true;
+        if (!moved && Math.hypot(moveEvent.clientX - startX, moveEvent.clientY - startY) > 3) {
+          moved = true;
+        }
+        if (!moved || startDistance === 0) return;
 
         const currentDistance = getDistanceToPoint(moveEvent.clientX, moveEvent.clientY, center);
-        const nextSteps = Math.trunc((currentDistance - startDistance) / RESIZE_PIXEL_STEP);
-        const stepDelta = nextSteps - appliedSteps;
-        if (stepDelta === 0) return;
-
-        appliedSteps = nextSteps;
-        commitResizeStep(Number((stepDelta * resizeStep).toFixed(2)));
+        const targetScale = startScale * (currentDistance / startDistance);
+        const clampedScale = Math.max(minScale, Math.min(maxScale, targetScale));
+        currentScale = Number(clampedScale.toFixed(2));
+        data.onResizeProgress?.(node.id, currentScale);
       };
 
       const onPointerUp = (upEvent: PointerEvent) => {
         upEvent.preventDefault();
         upEvent.stopPropagation();
-        if (!moved && appliedSteps === 0) {
-          commitResizeStep(resizeStep);
-        }
         cleanup();
+        if (!moved) {
+          const targetScale = startScale + resizeStep;
+          const clampedScale = Math.max(minScale, Math.min(maxScale, targetScale));
+          const finalScale = Number(clampedScale.toFixed(2));
+          data.onResizeCommit?.(node.id, finalScale);
+        } else {
+          data.onResizeCommit?.(node.id, currentScale);
+        }
       };
 
       ownerWindow.addEventListener("pointermove", onPointerMove);
@@ -181,7 +194,7 @@ export const MindNode = memo(function MindNode(props: NodeProps) {
       ownerWindow.addEventListener("pointercancel", onPointerUp);
       resizeCleanup.current = cleanup;
     },
-    [commitResizeStep, resizeStep],
+    [data, node.id, node.style.scale, resizeStep],
   );
 
   const onResizeKeyDown = useCallback(

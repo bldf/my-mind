@@ -14,6 +14,7 @@ export default [
       "**/.vitepress/.temp/**",
       "**/.vitepress/cache/**",
       "**/.vitepress/dist/**",
+      ".agents/**",
       ".codex/**",
       ".claude/**",
       "coverage/**",

@@ -24,11 +24,15 @@ export interface FlowConversionOptions {
   onTitleCommit?: (nodeId: NodeId, title: string) => void;
   onEnterNodeView?: (nodeId: NodeId) => void;
   onResizeNode?: (nodeIds: NodeId[], delta: number) => void;
+  onResizeProgress?: (nodeId: NodeId, scale: number) => void;
+  onResizeCommit?: (nodeId: NodeId, scale: number) => void;
   onAddChild?: (nodeId: NodeId) => void;
   onToggleCollapse?: (nodeId: NodeId) => void;
   onExpandCollapsed?: (nodeId: NodeId) => void;
   showNodeResizeControls?: boolean;
   nodeResizeStep?: number;
+  nodeMinScale?: number;
+  nodeMaxScale?: number;
   renderNode?: (node: MindMapNode, selected: boolean) => ReactNode;
 }
 
@@ -246,9 +250,13 @@ export function documentToFlow(
         showCollapseControl: options.showCollapseControl,
         showNodeResizeControls: options.showNodeResizeControls,
         nodeResizeStep: options.nodeResizeStep,
+        nodeMinScale: options.nodeMinScale,
+        nodeMaxScale: options.nodeMaxScale,
         onTitleCommit: options.onTitleCommit,
         onEnterNodeView: options.onEnterNodeView,
         onResizeNode: options.onResizeNode,
+        onResizeProgress: options.onResizeProgress,
+        onResizeCommit: options.onResizeCommit,
         onAddChild: options.onAddChild,
         onToggleCollapse: options.onToggleCollapse,
         onExpandCollapsed: options.onExpandCollapsed,

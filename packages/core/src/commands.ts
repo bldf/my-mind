@@ -28,6 +28,10 @@ function operation(before: MindMapDocument, after: MindMapDocument, command: Min
   };
 }
 
+function documentsEqual(left: MindMapDocument, right: MindMapDocument): boolean {
+  return JSON.stringify(left) === JSON.stringify(right);
+}
+
 function finalize(before: MindMapDocument, after: MindMapDocument, command: MindMapCommand): CommandResult {
   const validation = validateDocument(after);
   if (!validation.ok) {
@@ -224,6 +228,10 @@ function applyDocumentCommand(document: MindMapDocument, command: Exclude<MindMa
     }
   }
 
+  if (documentsEqual(before, next)) {
+    return { ok: true, document };
+  }
+
   next.revision += 1;
   return finalize(before, next, command);
 }
@@ -243,8 +251,8 @@ export function dispatchCommand(document: MindMapDocument, command: MindMapComma
     selection = result.selection ?? selection;
   }
 
-  if (JSON.stringify(before) === JSON.stringify(current)) {
-    return { ok: true, document: current, selection };
+  if (documentsEqual(before, current)) {
+    return { ok: true, document, selection };
   }
 
   return {

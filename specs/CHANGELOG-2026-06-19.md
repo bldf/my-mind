@@ -51,3 +51,25 @@
 - Drop geometry 使用当前指针点和已测得节点尺寸合成 moving rect，避免 React Flow drag callback 中 DOM rect position flush 时序导致 before/after 与 reparent 误判。
 - 排序只在目标外侧空隙且 cross-axis 有足够重叠时触发；拖在目标内部即按有效重合入子处理。
 - 取消 revision 驱动的 auto fit 后，E2E 需要把连续 before/after 排序拆成 fresh page 或显式用户 `fitView` 场景，因为 drop 后不自动 fit 是预期行为。
+
+## Feature 9: Canvas Drag Resize Polish
+
+### 新增
+
+- 节点四角 resize 手势改为连续距离比缩放；拖动中只更新本地临时 `scale`，释放鼠标后再单次提交 `node.resize`。
+- 点击 resize handle 且未发生有效位移时，保留单步 `nodeSizing.scaleStep` 缩放行为。
+- `MindMapEditor` 将后续 `flowData` 变更改为 render-phase 同步，降低 React Flow 运行时节点元数据丢失造成的拖拽闪烁风险。
+
+### 关键文件
+
+- `packages/react/src/nodes/MindNode.tsx` — resize 指针事件监听、距离比计算和点击微调。
+- `packages/react/src/MindMapEditor.tsx` — `onResizeProgress`、`onResizeCommit` 和 render-phase flow data 同步。
+- `packages/react/src/document-to-flow.ts` — 将 resize progress / commit 与 scale 边界传递至节点。
+- `packages/react/src/__tests__/react-smoke.test.tsx` — 连续拖拽缩放与点击微调单元测试。
+- `tests/e2e/playground.spec.ts` — 拖动中不写入 JSON、释放后一次提交、一次 undo 还原的 E2E。
+
+### 架构决策
+
+- 拖动缩放过程不写入 document/history，避免高频 `onChange` 和撤销栈碎片。
+- 初始 flow data 仍在 effect 中同步；后续 flow data 变化在 render phase 同步，避免提交后单帧状态不一致。
+- JSDOM 下缺少 `PointerEvent` 时，用 `MouseEvent` 构造器作为测试 fallback。

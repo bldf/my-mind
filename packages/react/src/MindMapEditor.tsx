@@ -199,13 +199,20 @@ function mergeFlowNodeData(
   const currentById = new Map(currentNodes.map((node) => [node.id, node]));
   return nextData.nodes.map((nextNode) => {
     const currentNode = currentById.get(nextNode.id);
-    return currentNode
-      ? {
-          ...nextNode,
-          position: currentNode.position,
-          selected: currentNode.selected,
-        }
-      : nextNode;
+    if (!currentNode) return nextNode;
+
+    const dataChanged = currentNode.data !== nextNode.data;
+    const styleChanged = currentNode.style !== nextNode.style;
+
+    if (!dataChanged && !styleChanged) {
+      return currentNode;
+    }
+
+    return {
+      ...currentNode,
+      style: nextNode.style,
+      data: nextNode.data,
+    };
   });
 }
 
@@ -235,12 +242,14 @@ function EditorCanvas(props: MindMapEditorProps) {
     [props.dragInteraction],
   );
   const dragSession = useRef<DragSession | null>(null);
+  const didInitialFlowDataSync = useRef(false);
   const flashTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [dropIntent, setDropIntent] = useState<DropIntent>(EMPTY_DROP_INTENT);
   const dropIntentRef = useRef<DropIntent>(EMPTY_DROP_INTENT);
   const [flashNodeId, setFlashNodeId] = useState<NodeId | undefined>();
   const [flowNodes, setFlowNodes] = useState<MindFlowNode[]>([]);
   const [flowEdges, setFlowEdges] = useState<FlowConversionResult["edges"]>([]);
+  const [prevFlowData, setPrevFlowData] = useState<FlowConversionResult | null>(null);
 
   const commitDocument = useCallback(
     (nextDocument: MindMapDocument) => {
@@ -414,6 +423,45 @@ function EditorCanvas(props: MindMapEditorProps) {
     [props.nodeSizing?.maxScale, props.nodeSizing?.minScale, runCommand],
   );
 
+  const onResizeProgress = useCallback(
+    (nodeId: NodeId, scale: number) => {
+      setFlowNodes((currentNodes) =>
+        currentNodes.map((flowNode) => {
+          if (flowNode.id === nodeId) {
+            return {
+              ...flowNode,
+              data: {
+                ...flowNode.data,
+                node: {
+                  ...flowNode.data.node,
+                  style: {
+                    ...flowNode.data.node.style,
+                    scale,
+                  },
+                },
+              },
+            };
+          }
+          return flowNode;
+        }),
+      );
+    },
+    [],
+  );
+
+  const onResizeCommit = useCallback(
+    (nodeId: NodeId, scale: number) => {
+      const node = document.nodes[nodeId];
+      if (!node) return;
+      const startScale = node.style.scale ?? 1;
+      const delta = Number((scale - startScale).toFixed(2));
+      if (delta !== 0) {
+        resizeNodes([nodeId], delta);
+      }
+    },
+    [document.nodes, resizeNodes],
+  );
+
   const onTitleCommit = useCallback(
     (nodeId: NodeId, title: string) => {
       runCommand(
@@ -441,9 +489,13 @@ function EditorCanvas(props: MindMapEditorProps) {
         showCollapseControl: dragSettings.showCollapseControl,
         showNodeResizeControls: props.nodeSizing?.showQuickControls !== false,
         nodeResizeStep: props.nodeSizing?.scaleStep,
+        nodeMinScale: props.nodeSizing?.minScale,
+        nodeMaxScale: props.nodeSizing?.maxScale,
         onTitleCommit,
         onEnterNodeView: enterViewRoot,
         onResizeNode: resizeNodes,
+        onResizeProgress,
+        onResizeCommit,
         onAddChild: addChildNode,
         onToggleCollapse: toggleNodeCollapse,
         onExpandCollapsed: expandCollapsedNode,
@@ -461,16 +513,31 @@ function EditorCanvas(props: MindMapEditorProps) {
       onTitleCommit,
       props.nodeSizing?.scaleStep,
       props.nodeSizing?.showQuickControls,
+      props.nodeSizing?.minScale,
+      props.nodeSizing?.maxScale,
       props.renderNode,
       readonly,
       resizeNodes,
+      onResizeProgress,
+      onResizeCommit,
       selection.nodeIds,
       toggleNodeCollapse,
       viewRootId,
     ],
   );
 
+  if (prevFlowData !== null && flowData !== prevFlowData) {
+    setPrevFlowData(flowData);
+    setFlowEdges(flowData.edges);
+    setFlowNodes((currentNodes) =>
+      mergeFlowNodeData(flowData, currentNodes, Boolean(dragSession.current)),
+    );
+  }
+
   useEffect(() => {
+    if (didInitialFlowDataSync.current) return;
+    didInitialFlowDataSync.current = true;
+    setPrevFlowData(flowData);
     setFlowEdges(flowData.edges);
     setFlowNodes((currentNodes) =>
       mergeFlowNodeData(flowData, currentNodes, Boolean(dragSession.current)),
