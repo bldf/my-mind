@@ -9,9 +9,11 @@ async function getPlaygroundDocument(page: import("@playwright/test").Page) {
         parentId: string | null;
         children: string[];
         links?: { label?: string; url: string }[];
+        metadata?: Record<string, unknown>;
+        position: { x: number; y: number };
         title: string;
         collapsed: boolean;
-        style?: { scale?: number };
+        style?: { scale?: number; backgroundColor?: string };
       }
     >;
   };
@@ -131,16 +133,28 @@ test("json data mode falls back to markdown when markdown is pasted", async ({ p
     .poll(async () => {
       const document = await getPlaygroundDocument(page);
       const topNode = Object.values(document.nodes).find((node) => node.title === "Topssssic 1");
+      const topic2 = Object.values(document.nodes).find(
+        (node) => node.parentId === document.rootId && node.title === "Topic 2",
+      );
       const linkNode = Object.values(document.nodes).find((node) => node.title === "Topic 88");
+      const root = document.nodes[document.rootId];
       return {
+        leftBranch: root && topNode ? topNode.position.x < root.position.x : false,
         link: linkNode?.links?.[0]?.url,
-        root: document.nodes[document.rootId]?.title,
+        rightBranch: root && topic2 ? topic2.position.x > root.position.x : false,
+        root: root?.title,
+        rootScale: root?.style?.scale,
+        topSide: topNode?.metadata?.branchSide,
         top: topNode?.title,
       };
     })
     .toEqual({
+      leftBranch: true,
       link: "https://example.com",
+      rightBranch: true,
       root: "100 node map",
+      rootScale: 1.25,
+      topSide: "left",
       top: "Topssssic 1",
     });
 });

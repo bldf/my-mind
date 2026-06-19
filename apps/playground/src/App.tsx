@@ -165,7 +165,7 @@ export default function App() {
       setError(formatError(parsed.error));
       return;
     }
-    updateDocument(parsed.value);
+    updateDocument(applyBranchPresentation(parsed.value));
   };
 
   return (
