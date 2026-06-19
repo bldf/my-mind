@@ -223,8 +223,10 @@ function EditorCanvas(props: MindMapEditorProps) {
   );
   const document = props.value ?? internalDocument;
   const readonly = Boolean(props.readonly);
+  const onViewRootChange = props.onViewRootChange;
   const [selection, setSelection] = useState<SelectionState>({ nodeIds: [], connectionIds: [] });
   const [viewRootId, setViewRootId] = useState<NodeId>(document.rootId);
+  const effectiveViewRootId = document.nodes[viewRootId] ? viewRootId : document.rootId;
   const [themePanelOpen, setThemePanelOpen] = useState(Boolean(props.themePanel?.defaultOpen));
   const [searchOpen, setSearchOpen] = useState(false);
   const [inspectorOpen, setInspectorOpen] = useState(!props.inspector?.hidden);
@@ -236,7 +238,7 @@ function EditorCanvas(props: MindMapEditorProps) {
   const nodesInitialized = useNodesInitialized();
   const theme = resolveTheme(localTheme ?? props.theme, document.theme);
   const themes = props.themePanel?.themes ?? defaultThemes;
-  const selectedNodeId = selection.nodeIds[0];
+  const selectedNodeId = selection.nodeIds.find((nodeId) => document.nodes[nodeId]);
   const dragSettings = useMemo(
     () => resolveDragInteractionSettings(props.dragInteraction),
     [props.dragInteraction],
@@ -273,6 +275,12 @@ function EditorCanvas(props: MindMapEditorProps) {
     },
     [props],
   );
+
+  useEffect(() => {
+    if (viewRootId === effectiveViewRootId) return;
+    setViewRootId(effectiveViewRootId);
+    onViewRootChange?.(effectiveViewRootId);
+  }, [effectiveViewRootId, onViewRootChange, viewRootId]);
 
   const autoLayoutDocument = useCallback((nextDocument: MindMapDocument) => {
     return applyLayoutResult(nextDocument, simpleTreeLayout(nextDocument));
@@ -405,9 +413,9 @@ function EditorCanvas(props: MindMapEditorProps) {
     (nodeId: NodeId) => {
       if (!document.nodes[nodeId]) return;
       setViewRootId(nodeId);
-      props.onViewRootChange?.(nodeId);
+      onViewRootChange?.(nodeId);
     },
-    [document.nodes, props],
+    [document.nodes, onViewRootChange],
   );
 
   const resizeNodes = useCallback(
@@ -480,7 +488,7 @@ function EditorCanvas(props: MindMapEditorProps) {
   const flowData = useMemo(
     () =>
       documentToFlow(document, {
-        viewRootId,
+        viewRootId: effectiveViewRootId,
         selectedNodeIds: selection.nodeIds,
         readonly,
         dropIntent,
@@ -507,6 +515,7 @@ function EditorCanvas(props: MindMapEditorProps) {
       dragSettings.showAddChildControl,
       dragSettings.showCollapseControl,
       dropIntent,
+      effectiveViewRootId,
       enterViewRoot,
       expandCollapsedNode,
       flashNodeId,
@@ -522,7 +531,6 @@ function EditorCanvas(props: MindMapEditorProps) {
       onResizeCommit,
       selection.nodeIds,
       toggleNodeCollapse,
-      viewRootId,
     ],
   );
 
@@ -778,7 +786,7 @@ function EditorCanvas(props: MindMapEditorProps) {
     (event: KeyboardEvent<HTMLDivElement>) => {
       if (event.target instanceof HTMLInputElement || event.target instanceof HTMLTextAreaElement)
         return;
-      const selected = selection.nodeIds[0] ?? viewRootId;
+      const selected = selectedNodeId ?? effectiveViewRootId;
       const parentId = document.nodes[selected]?.parentId ?? document.rootId;
       if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === "z" && event.shiftKey) {
         event.preventDefault();
@@ -823,12 +831,13 @@ function EditorCanvas(props: MindMapEditorProps) {
       commitSelection,
       document.nodes,
       document.rootId,
+      effectiveViewRootId,
       readonly,
       redo,
       runCommand,
+      selectedNodeId,
       selection.nodeIds,
       undo,
-      viewRootId,
     ],
   );
 
@@ -844,7 +853,7 @@ function EditorCanvas(props: MindMapEditorProps) {
   } as CSSProperties;
 
   const controls = props.toolbar?.controls ?? DEFAULT_TOOLBAR;
-  const autoFitKey = `${document.id}:${viewRootId}`;
+  const autoFitKey = `${document.id}:${effectiveViewRootId}`;
   const renderedNodes =
     flowNodes.length > 0 || flowData.nodes.length === 0 ? flowNodes : flowData.nodes;
   const renderedEdges =
@@ -875,7 +884,11 @@ function EditorCanvas(props: MindMapEditorProps) {
       tabIndex={0}
     >
       {!props.breadcrumbs?.hidden ? (
-        <Breadcrumbs document={document} viewRootId={viewRootId} onNavigate={enterViewRoot} />
+        <Breadcrumbs
+          document={document}
+          viewRootId={effectiveViewRootId}
+          onNavigate={enterViewRoot}
+        />
       ) : null}
       {!props.toolbar?.hidden ? <Toolbar controls={controls} onAction={onToolbarAction} /> : null}
       {Object.keys(document.nodes).length === 0 ? (
@@ -909,7 +922,7 @@ function EditorCanvas(props: MindMapEditorProps) {
           onPaneClick={() => commitSelection({ nodeIds: [], connectionIds: [] })}
           onPaneContextMenu={(event) => {
             event.preventDefault();
-            enterViewRoot(selection.nodeIds[0] ?? viewRootId);
+            enterViewRoot(selectedNodeId ?? effectiveViewRootId);
           }}
         >
           <MiniMap pannable zoomable />

@@ -5,13 +5,17 @@ import {
   serializeDocument,
   simpleTreeLayout,
   type MindMapDocument,
+  type MindMapError,
   type NodeId,
 } from "@my-mind-node/core";
 import { exportMindMap } from "@my-mind-node/exporters";
-import { importMindMap } from "@my-mind-node/importers";
+import { importMindMap, type ImportFormat } from "@my-mind-node/importers";
 import { MindMapEditor, OutlineEditor } from "@my-mind-node/react";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import fixture from "../../../tests/fixtures/100-nodes.json";
+
+type TextFormat = Extract<ImportFormat, "json" | "markdown">;
+type DataTab = TextFormat | "outline";
 
 const BRANCH_PALETTES = {
   left: {
@@ -27,6 +31,18 @@ const BRANCH_PALETTES = {
     text: "#301428",
   },
 };
+
+function formatError(error: MindMapError): string {
+  return `${error.code}: ${error.message}`;
+}
+
+function getTextareaLabel(format: TextFormat): string {
+  return format === "json" ? "Mind map JSON" : "Mind map Markdown";
+}
+
+function looksLikeMarkdown(value: string): boolean {
+  return /^\s{0,3}#{1,6}\s+\S/m.test(value) || /^\s*(?:[-*+]|\d+\.)\s+\S/m.test(value);
+}
 
 function applyBranchPresentation(document: MindMapDocument): MindMapDocument {
   const next = cloneDocument(document);
@@ -93,20 +109,60 @@ export default function App() {
   const [document, setDocument] = useState<MindMapDocument>(() => {
     return initialDocument;
   });
-  const [json, setJson] = useState(() => serializeDocument(document));
+  const [editorText, setEditorText] = useState(() => serializeDocument(document));
   const [error, setError] = useState<string | undefined>();
-  const [tab, setTab] = useState<"json" | "outline">("json");
+  const [tab, setTab] = useState<DataTab>("json");
+
+  useEffect(() => {
+    let cancelled = false;
+
+    if (tab === "outline") return;
+
+    if (tab === "json") {
+      setEditorText(serializeDocument(document));
+      return;
+    }
+
+    const syncMarkdown = async () => {
+      const result = await exportMindMap(document, "markdown");
+      if (cancelled) return;
+      if (result.ok) setEditorText(String(result.value));
+      else setError(formatError(result.error));
+    };
+
+    void syncMarkdown();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [document, tab]);
 
   const updateDocument = (next: MindMapDocument) => {
     setDocument(next);
-    setJson(serializeDocument(next));
     setError(undefined);
   };
 
-  const applyJson = () => {
-    const parsed = parseDocument(json);
+  const selectTab = (nextTab: DataTab) => {
+    setTab(nextTab);
+    setError(undefined);
+  };
+
+  const applyEditorText = async () => {
+    if (tab === "outline") return;
+
+    let parsed = await importMindMap(editorText, tab);
+    if (
+      !parsed.ok &&
+      tab === "json" &&
+      parsed.error.code === "INVALID_JSON" &&
+      looksLikeMarkdown(editorText)
+    ) {
+      parsed = await importMindMap(editorText, "markdown");
+      if (parsed.ok) setTab("markdown");
+    }
+
     if (!parsed.ok) {
-      setError(`${parsed.error.code}: ${parsed.error.message}`);
+      setError(formatError(parsed.error));
       return;
     }
     updateDocument(parsed.value);
@@ -117,46 +173,45 @@ export default function App() {
       <section className="workspace" aria-label="Mind map playground">
         <aside className="data-pane">
           <div className="segmented" role="tablist" aria-label="Data mode">
-            <button type="button" aria-selected={tab === "json"} onClick={() => setTab("json")}>
+            <button type="button" aria-selected={tab === "json"} onClick={() => selectTab("json")}>
               JSON
             </button>
-            <button type="button" aria-selected={tab === "outline"} onClick={() => setTab("outline")}>
+            <button
+              type="button"
+              aria-selected={tab === "markdown"}
+              onClick={() => selectTab("markdown")}
+            >
+              Markdown
+            </button>
+            <button
+              type="button"
+              aria-selected={tab === "outline"}
+              onClick={() => selectTab("outline")}
+            >
               Outline
             </button>
           </div>
-          {tab === "json" ? (
+          {tab === "json" || tab === "markdown" ? (
             <>
-              <textarea aria-label="Mind map JSON" value={json} onChange={(event) => setJson(event.target.value)} spellCheck={false} />
+              <textarea
+                aria-label={getTextareaLabel(tab)}
+                value={editorText}
+                onChange={(event) => setEditorText(event.target.value)}
+                spellCheck={false}
+              />
               <div className="actions">
-                <button type="button" onClick={applyJson}>
+                <button type="button" onClick={applyEditorText}>
                   Apply
                 </button>
-                <button
-                  type="button"
-                  onClick={async () => {
-                    const result = await importMindMap(json, "json");
-                    if (result.ok) updateDocument(result.value);
-                    else setError(result.error.message);
-                  }}
-                >
+                <button type="button" onClick={applyEditorText}>
                   Import
                 </button>
-                <button
-                  type="button"
-                  onClick={async () => {
-                    const result = await exportMindMap(document, "markdown");
-                    if (result.ok) setJson(String(result.value));
-                    else setError(result.error.message);
-                  }}
-                >
-                  Markdown
-                </button>
               </div>
-              {error ? <p className="error">{error}</p> : null}
             </>
           ) : (
             <OutlineEditor value={document} onChange={updateDocument} />
           )}
+          {error ? <p className="error">{error}</p> : null}
         </aside>
         <section className="canvas-pane">
           <MindMapEditor
@@ -164,7 +219,9 @@ export default function App() {
             height="100%"
             breadcrumbs={{ hidden: true }}
             inspector={{ hidden: true }}
-            toolbar={{ controls: ["theme", "search", "fullscreen", "zoomOut", "zoomIn", "fitView", "export"] }}
+            toolbar={{
+              controls: ["theme", "search", "fullscreen", "zoomOut", "zoomIn", "fitView", "export"],
+            }}
             onChange={updateDocument}
             onError={(mindMapError) => setError(`${mindMapError.code}: ${mindMapError.message}`)}
           />

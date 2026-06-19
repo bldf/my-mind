@@ -8,6 +8,7 @@ async function getPlaygroundDocument(page: import("@playwright/test").Page) {
       {
         parentId: string | null;
         children: string[];
+        links?: { label?: string; url: string }[];
         title: string;
         collapsed: boolean;
         style?: { scale?: number };
@@ -87,6 +88,61 @@ test("json parse errors are visible", async ({ page }) => {
   await page.getByLabel("Mind map JSON").fill("{");
   await page.getByRole("button", { name: "Apply" }).click();
   await expect(page.getByText(/INVALID_JSON/)).toBeVisible();
+});
+
+test("markdown data mode applies markdown instead of parsing it as json", async ({ page }) => {
+  await page.goto("/");
+  await page.getByRole("button", { name: "Markdown" }).click();
+  await page.getByLabel("Mind map Markdown").fill("# Edited map\n- Alpha\n  - Beta");
+  await page.getByRole("button", { name: "Apply" }).click();
+
+  await expect(page.getByText(/INVALID_JSON/)).toHaveCount(0);
+  await expect(page.getByLabel("Title for Edited map")).toBeVisible();
+  await expect(page.getByLabel("Title for Alpha")).toBeVisible();
+  await page.getByRole("button", { name: "JSON" }).click();
+  await expect
+    .poll(async () => {
+      const document = await getPlaygroundDocument(page);
+      const root = document.nodes[document.rootId];
+      const alpha = root?.children[0] ? document.nodes[root.children[0]] : undefined;
+      const beta = alpha?.children[0] ? document.nodes[alpha.children[0]] : undefined;
+      return [root?.title, alpha?.title, beta?.title].join(">");
+    })
+    .toBe("Edited map>Alpha>Beta");
+});
+
+test("json data mode falls back to markdown when markdown is pasted", async ({ page }) => {
+  await page.goto("/");
+  await page.getByLabel("Mind map JSON").fill(`# 100 node map
+- Topssssic 1
+  - Topic 5
+    - Topic 21
+      - Topic 88
+        - [Example](https://example.com)
+- Topic 2`);
+  await page.getByRole("button", { name: "Apply" }).click();
+
+  await expect(page.getByText(/INVALID_JSON/)).toHaveCount(0);
+  await expect(page.getByLabel("Mind map Markdown")).toBeVisible();
+  await expect(page.getByLabel("Title for 100 node map")).toBeVisible();
+  await expect(page.getByLabel("Title for Topssssic 1")).toBeVisible();
+  await page.getByRole("button", { name: "JSON" }).click();
+  await expect
+    .poll(async () => {
+      const document = await getPlaygroundDocument(page);
+      const topNode = Object.values(document.nodes).find((node) => node.title === "Topssssic 1");
+      const linkNode = Object.values(document.nodes).find((node) => node.title === "Topic 88");
+      return {
+        link: linkNode?.links?.[0]?.url,
+        root: document.nodes[document.rootId]?.title,
+        top: topNode?.title,
+      };
+    })
+    .toEqual({
+      link: "https://example.com",
+      root: "100 node map",
+      top: "Topssssic 1",
+    });
 });
 
 test("dragging a node follows the pointer and then returns to the stable layout", async ({
@@ -302,9 +358,7 @@ test("dragging corner resize handle scales the node 1:1 and commits once", async
   await expect
     .poll(async () => (await renderedNode.boundingBox())?.width ?? 0)
     .toBeGreaterThan(beforeBox.width);
-  expect((await getPlaygroundDocument(page)).nodes["node-1"]?.style?.scale ?? 1).toBe(
-    beforeScale,
-  );
+  expect((await getPlaygroundDocument(page)).nodes["node-1"]?.style?.scale ?? 1).toBe(beforeScale);
   await page.mouse.up();
 
   await expect

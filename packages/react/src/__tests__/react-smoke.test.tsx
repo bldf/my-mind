@@ -1,4 +1,4 @@
-import { cleanup, fireEvent, render, screen } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import {
   asNodeId,
@@ -66,6 +66,19 @@ describe("@my-mind-node/react", () => {
     const document = createEmptyDocument({ rootTitle: "Viewer root" });
     render(<MindMapViewer value={document} height={360} />);
     expect(screen.getByLabelText("Mind map tools")).toBeTruthy();
+  });
+
+  it("renders a controlled document after its root id changes", async () => {
+    const firstDocument = createEmptyDocument({ rootTitle: "First root" });
+    const nextDocument = createEmptyDocument({ rootTitle: "Next root" });
+    const { rerender } = render(<MindMapEditor value={firstDocument} />);
+
+    expect(screen.getByLabelText("Title for First root")).toBeTruthy();
+
+    rerender(<MindMapEditor value={nextDocument} />);
+
+    await waitFor(() => expect(screen.getByLabelText("Title for Next root")).toBeTruthy());
+    expect(screen.queryByLabelText("Title for First root")).toBeNull();
   });
 
   it("renders an outline editor", () => {
