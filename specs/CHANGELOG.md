@@ -5,10 +5,11 @@
 完成 `7.node-drag-interaction-polish/`，补齐 playground 中节点拖拽整理工作流：
 
 - `MindMapEditor` 接入 React Flow 受控节点变化与 drag session，拖动中只更新预览状态。
-- 支持中心 dwell 入子、上/下区同级排序、非法目标错误、释放后自动稳定排版。
-- `MindNode` 增加 hover 加子节点与展开/折叠控件，并补齐 drop intent、插入线、flash 和只读隐藏逻辑。
-- 新增 `dragInteraction` 实验配置、React smoke 覆盖和 Playwright 100 节点 fixture 交互 E2E。
-- `tasks.md` 共 14 个任务均已标记为 `[x]`。
+- 支持中心区 mouseup 即时入子、上/下区同级排序、非法目标错误、释放后自动稳定排版。
+- `MindNode` 增加 hover 加子节点与展开/折叠控件，标题编辑改为支持换行的 `textarea`，并补齐 drop intent、插入线、flash 和只读隐藏逻辑。
+- core 布局估算支持显式换行和软换行高度，标题提交后按新尺寸重新布局并触发 fit view。
+- 新增 `dragInteraction` 实验配置、React smoke/core 覆盖和 Playwright 100 节点 fixture 交互 E2E。
+- `tasks.md` 共 23 个任务均已标记为 `[x]`。
 
 ## 2026-06-18 - M0-M4 implementation in current repo
 

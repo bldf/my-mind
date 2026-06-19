@@ -61,7 +61,6 @@ type MindFlowNode = Node<MindNodeData, "mindNode">;
 
 interface DragInteractionSettings {
   enabled: boolean;
-  reparentDwellMs: number;
   sortZoneRatio: number;
   flashDurationMs: number;
   autoLayoutOnDrop: boolean;
@@ -76,7 +75,6 @@ interface DragSession {
 function resolveDragInteractionSettings(config: MindMapEditorProps["dragInteraction"]): DragInteractionSettings {
   return {
     enabled: config?.enabled ?? true,
-    reparentDwellMs: config?.reparentDwellMs ?? 2000,
     sortZoneRatio: config?.sortZoneRatio ?? 0.3,
     flashDurationMs: config?.flashDurationMs ?? 320,
     autoLayoutOnDrop: config?.autoLayoutOnDrop ?? true,
@@ -132,8 +130,6 @@ function EditorCanvas(props: MindMapEditorProps) {
   const selectedNodeId = selection.nodeIds[0];
   const dragSettings = useMemo(() => resolveDragInteractionSettings(props.dragInteraction), [props.dragInteraction]);
   const dragSession = useRef<DragSession | null>(null);
-  const dwellTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const dwellTargetId = useRef<NodeId | null>(null);
   const flashTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [dropIntent, setDropIntent] = useState<DropIntent>(EMPTY_DROP_INTENT);
   const dropIntentRef = useRef<DropIntent>(EMPTY_DROP_INTENT);
@@ -166,14 +162,6 @@ function EditorCanvas(props: MindMapEditorProps) {
 
   const autoLayoutDocument = useCallback((nextDocument: MindMapDocument) => {
     return applyLayoutResult(nextDocument, simpleTreeLayout(nextDocument));
-  }, []);
-
-  const clearDwellTimer = useCallback(() => {
-    if (dwellTimer.current) {
-      clearTimeout(dwellTimer.current);
-      dwellTimer.current = null;
-    }
-    dwellTargetId.current = null;
   }, []);
 
   const clearFlashTimer = useCallback(() => {
@@ -284,7 +272,7 @@ function EditorCanvas(props: MindMapEditorProps) {
 
   const onTitleCommit = useCallback(
     (nodeId: NodeId, title: string) => {
-      runCommand({ type: "node.update", nodeId, patch: { title }, meta: { source: "canvas", label: "Rename node" } });
+      runCommand({ type: "node.update", nodeId, patch: { title }, meta: { source: "canvas", label: "Rename node" } }, { autoLayout: true });
     },
     [runCommand],
   );
@@ -355,42 +343,13 @@ function EditorCanvas(props: MindMapEditorProps) {
       const mode = zone === "center" ? "reparent" : "sort";
       const reason = getDropValidationReason(document, movingNodeIds, hitTarget.id, mode);
       if (reason) return { type: "invalid", targetId: hitTarget.id, reason };
-      if (zone === "center") return { type: "reparent", targetId: hitTarget.id, armed: false };
+      if (zone === "center") return { type: "reparent", targetId: hitTarget.id };
       return { type: zone === "before" ? "sort-before" : "sort-after", targetId: hitTarget.id };
     },
     [document, dragSettings.sortZoneRatio, flowNodes],
   );
 
-  const updateDropIntent = useCallback(
-    (nextIntent: DropIntent) => {
-      if (nextIntent.type !== "reparent") {
-        clearDwellTimer();
-        commitDropIntent(nextIntent);
-        return;
-      }
-
-      const currentIntent = dropIntentRef.current;
-      if (currentIntent.type === "reparent" && currentIntent.targetId === nextIntent.targetId && currentIntent.armed) {
-        commitDropIntent(currentIntent);
-        return;
-      }
-
-      commitDropIntent(nextIntent);
-      if (dwellTargetId.current === nextIntent.targetId) return;
-      clearDwellTimer();
-      dwellTargetId.current = nextIntent.targetId;
-      dwellTimer.current = setTimeout(() => {
-        dwellTimer.current = null;
-        dwellTargetId.current = null;
-        const latestIntent = dropIntentRef.current;
-        if (latestIntent.type === "reparent" && latestIntent.targetId === nextIntent.targetId && !latestIntent.armed) {
-          commitDropIntent({ ...latestIntent, armed: true });
-          flashDropTarget(nextIntent.targetId);
-        }
-      }, dragSettings.reparentDwellMs);
-    },
-    [clearDwellTimer, commitDropIntent, dragSettings.reparentDwellMs, flashDropTarget],
-  );
+  const updateDropIntent = useCallback((nextIntent: DropIntent) => commitDropIntent(nextIntent), [commitDropIntent]);
 
   const reportDropError = useCallback(
     (code: string, message: string, details?: unknown) => {
@@ -410,10 +369,6 @@ function EditorCanvas(props: MindMapEditorProps) {
         return false;
       }
       if (intent.type === "reparent") {
-        if (!intent.armed) {
-          reportDropError("DROP_DWELL_REQUIRED", "Hold over the node center for 2 seconds to add as a child", { targetId: intent.targetId });
-          return false;
-        }
         const reason = getDropValidationReason(document, movingNodeIds, intent.targetId, "reparent");
         if (reason) {
           reportDropError("INVALID_DROP_TARGET", reason, { targetId: intent.targetId });
@@ -423,6 +378,7 @@ function EditorCanvas(props: MindMapEditorProps) {
           { type: "node.moveMany", nodeIds: movingNodeIds, parentId: intent.targetId, meta: { source: "canvas", label: "Move nodes" } },
           { autoLayout: dragSettings.autoLayoutOnDrop },
         );
+        if (result?.ok) flashDropTarget(intent.targetId);
         return Boolean(result?.ok);
       }
 
@@ -444,9 +400,10 @@ function EditorCanvas(props: MindMapEditorProps) {
         },
         { autoLayout: dragSettings.autoLayoutOnDrop },
       );
+      if (result?.ok) flashDropTarget(intent.targetId);
       return Boolean(result?.ok);
     },
-    [document, dragSettings.autoLayoutOnDrop, reportDropError, runCommand],
+    [document, dragSettings.autoLayoutOnDrop, flashDropTarget, reportDropError, runCommand],
   );
 
   const onNodeDragStart = useCallback<OnNodeDrag<MindFlowNode>>(
@@ -456,13 +413,12 @@ function EditorCanvas(props: MindMapEditorProps) {
       const selectedNodeIds = selection.nodeIds.includes(nodeId) ? selection.nodeIds : [nodeId];
       const movingNodeIds = getTopLevelMovableNodeIds(document, selectedNodeIds);
       dragSession.current = { nodeIds: movingNodeIds };
-      clearDwellTimer();
       commitDropIntent(EMPTY_DROP_INTENT);
       if (!selection.nodeIds.includes(nodeId)) {
         commitSelection({ nodeIds: [nodeId], connectionIds: [], anchorNodeId: nodeId });
       }
     },
-    [clearDwellTimer, commitDropIntent, commitSelection, document, dragSettings.enabled, readonly, selection.nodeIds],
+    [commitDropIntent, commitSelection, document, dragSettings.enabled, readonly, selection.nodeIds],
   );
 
   const onNodeDrag = useCallback<OnNodeDrag<MindFlowNode>>(
@@ -483,9 +439,8 @@ function EditorCanvas(props: MindMapEditorProps) {
       const point = getEventClientPoint(event);
       const currentIntent = dropIntentRef.current;
       const resolvedIntent = point ? getDropIntentAtPoint(point, session.nodeIds) : currentIntent;
-      const finalIntent = currentIntent.type === "none" ? resolvedIntent : currentIntent;
+      const finalIntent = point ? resolvedIntent : currentIntent;
       dragSession.current = null;
-      clearDwellTimer();
       const committed = commitDrop(finalIntent, session.nodeIds);
       commitDropIntent(EMPTY_DROP_INTENT);
       if (!committed) {
@@ -493,7 +448,7 @@ function EditorCanvas(props: MindMapEditorProps) {
         setFlowNodes(flowData.nodes);
       }
     },
-    [clearDwellTimer, commitDrop, commitDropIntent, dragSettings.enabled, flowData.edges, flowData.nodes, getDropIntentAtPoint, readonly],
+    [commitDrop, commitDropIntent, dragSettings.enabled, flowData.edges, flowData.nodes, getDropIntentAtPoint, readonly],
   );
 
   const onToolbarAction = useCallback(
@@ -569,13 +524,12 @@ function EditorCanvas(props: MindMapEditorProps) {
     "--mmn-edge": theme.colors.edge,
     "--mmn-selected": theme.colors.selected,
     "--mmn-accent": theme.colors.accent,
-    "--mmn-drop-dwell-duration": `${dragSettings.reparentDwellMs}ms`,
     "--mmn-drop-flash-duration": `${dragSettings.flashDurationMs}ms`,
     height: props.height ?? 640,
   } as CSSProperties;
 
   const controls = props.toolbar?.controls ?? DEFAULT_TOOLBAR;
-  const autoFitKey = `${document.id}:${viewRootId}:${flowData.nodes.length}`;
+  const autoFitKey = `${document.id}:${document.revision}:${viewRootId}:${flowData.nodes.length}`;
   const renderedNodes = flowNodes.length > 0 || flowData.nodes.length === 0 ? flowNodes : flowData.nodes;
   const renderedEdges = flowEdges.length > 0 || flowData.edges.length === 0 ? flowEdges : flowData.edges;
 
@@ -584,16 +538,15 @@ function EditorCanvas(props: MindMapEditorProps) {
     if (lastAutoFitKey.current === autoFitKey) return;
     lastAutoFitKey.current = autoFitKey;
 
-    const frame = requestAnimationFrame(() => flow.fitView({ padding: 0.12 }));
+    const frame = requestAnimationFrame(() => flow.fitView({ padding: 0.18 }));
     return () => cancelAnimationFrame(frame);
   }, [autoFitKey, flow, flowData.nodes.length, nodesInitialized, props.viewport?.fitViewOnInit]);
 
   useEffect(() => {
     return () => {
-      clearDwellTimer();
       clearFlashTimer();
     };
-  }, [clearDwellTimer, clearFlashTimer]);
+  }, [clearFlashTimer]);
 
   return (
     <div ref={containerRef} className={["mmn-editor", props.className].filter(Boolean).join(" ")} style={style} onKeyDown={onKeyDown} tabIndex={0}>

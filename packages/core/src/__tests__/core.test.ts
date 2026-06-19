@@ -3,6 +3,8 @@ import {
   createEmptyDocument,
   documentToLayoutGraph,
   dispatchCommand,
+  estimateLayoutNodeHeight,
+  estimateLayoutTitleWidth,
   exportIndentedText,
   importIndentedText,
   parseDocument,
@@ -79,5 +81,15 @@ describe("@my-mind-node/core", () => {
 
     expect(compact.width).toBeLessThan(mixed.width);
     expect(compact.width).toBeLessThan(80);
+  });
+
+  it("uses explicit title line breaks when estimating layout size", () => {
+    const singleLineDocument = createEmptyDocument({ rootTitle: "Alpha Beta" });
+    const multiLineDocument = createEmptyDocument({ rootTitle: "Alpha\nBeta" });
+    const singleLine = singleLineDocument.nodes[singleLineDocument.rootId]!;
+    const multiLine = multiLineDocument.nodes[multiLineDocument.rootId]!;
+
+    expect(estimateLayoutTitleWidth("Alpha\nBeta")).toBe(estimateLayoutTitleWidth("Alpha"));
+    expect(estimateLayoutNodeHeight(multiLine)).toBeGreaterThan(estimateLayoutNodeHeight(singleLine));
   });
 });

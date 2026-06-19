@@ -1,6 +1,14 @@
-import { estimateLayoutNodeWidth, getNodeWidthOverride, type MindMapNode, type NodeId } from "@my-mind-node/core";
+import {
+  MAX_NODE_WIDTH,
+  NODE_HORIZONTAL_PADDING,
+  estimateLayoutNodeWidth,
+  estimateLayoutTitleWidth,
+  getNodeWidthOverride,
+  type MindMapNode,
+  type NodeId,
+} from "@my-mind-node/core";
 import { ChevronLeft, ChevronRight, Minus, MoveRight, Plus } from "lucide-react";
-import { memo, useState } from "react";
+import { memo, useEffect, useState } from "react";
 import type { ReactNode } from "react";
 import { Handle, Position, type NodeProps } from "@xyflow/react";
 import { getDropIntentLabel, type DropIntent, type MindNodeBranchSide } from "../drag-interactions";
@@ -27,16 +35,32 @@ function getNodeWidth(node: MindMapNode, readonly: boolean): number | undefined 
   return estimateLayoutNodeWidth(node);
 }
 
+function getTextareaRows(value: string, width = MAX_NODE_WIDTH): number {
+  const contentWidth = Math.max(1, width - NODE_HORIZONTAL_PADDING);
+  return value
+    .split(/\r\n|\r|\n/)
+    .reduce((total, line) => total + Math.max(1, Math.ceil(estimateLayoutTitleWidth(line) / contentWidth)), 0);
+}
+
+function getCommittedTitle(value: string): string {
+  return value.trim().length > 0 ? value : "Untitled";
+}
+
 export const MindNode = memo(function MindNode(props: NodeProps) {
   const data = props.data as MindNodeData;
   const node = data.node;
   const [draft, setDraft] = useState(node.title);
   const scale = node.style.scale ?? 1;
+  const nodeWidth = getNodeWidth(node, Boolean(data.readonly));
   const dropLabel = data.dropIntent ? getDropIntentLabel(data.dropIntent) : undefined;
   const canShowAddChild = !data.readonly && data.showAddChildControl !== false && Boolean(data.onAddChild);
   const canShowCollapse =
     !data.readonly && data.showCollapseControl !== false && node.children.length > 0 && Boolean(data.onToggleCollapse);
   const collapseLabel = node.collapsed ? "Expand node" : "Collapse node";
+
+  useEffect(() => {
+    setDraft(node.title);
+  }, [node.id, node.title]);
 
   return (
     <div
@@ -55,7 +79,7 @@ export const MindNode = memo(function MindNode(props: NodeProps) {
         .filter(Boolean)
         .join(" ")}
       style={{
-        width: getNodeWidth(node, Boolean(data.readonly)),
+        width: nodeWidth,
         transform: `scale(${scale})`,
         borderColor: node.style.borderColor,
         background: node.style.backgroundColor,
@@ -75,14 +99,16 @@ export const MindNode = memo(function MindNode(props: NodeProps) {
           {node.title}
         </button>
       ) : (
-        <input
-          className="mmn-node__title"
+        <textarea
+          className="mmn-node__title mmn-node__title--editable"
           value={draft}
+          rows={getTextareaRows(draft, nodeWidth)}
           aria-label={`Title for ${node.title}`}
           onChange={(event) => setDraft(event.target.value)}
-          onBlur={() => data.onTitleCommit?.(node.id, draft.trim() || "Untitled")}
+          onBlur={() => data.onTitleCommit?.(node.id, getCommittedTitle(draft))}
           onKeyDown={(event) => {
-            if (event.key === "Enter") {
+            if (event.key === "Enter" && !event.shiftKey) {
+              event.preventDefault();
               event.currentTarget.blur();
             }
           }}
@@ -110,6 +136,8 @@ export const MindNode = memo(function MindNode(props: NodeProps) {
           type="button"
           title="Add child"
           aria-label={`Add child to ${node.title}`}
+          onPointerDown={(event) => event.stopPropagation()}
+          onMouseDown={(event) => event.stopPropagation()}
           onClick={(event) => {
             event.stopPropagation();
             data.onAddChild?.(node.id);
@@ -124,6 +152,8 @@ export const MindNode = memo(function MindNode(props: NodeProps) {
           type="button"
           title={collapseLabel}
           aria-label={`${collapseLabel} ${node.title}`}
+          onPointerDown={(event) => event.stopPropagation()}
+          onMouseDown={(event) => event.stopPropagation()}
           onClick={(event) => {
             event.stopPropagation();
             data.onToggleCollapse?.(node.id);

@@ -41,7 +41,8 @@ function getTitleCharacterWidth(character: string): number {
 }
 
 export function estimateLayoutTitleWidth(title: string): number {
-  return Array.from(title).reduce((total, character) => total + getTitleCharacterWidth(character), 0);
+  const lineWidths = title.split(/\r\n|\r|\n/).map((line) => Array.from(line).reduce((total, character) => total + getTitleCharacterWidth(character), 0));
+  return Math.max(0, ...lineWidths);
 }
 
 export function getNodeWidthOverride(node: Pick<MindMapNode, "metadata">): number | undefined {
@@ -52,13 +53,21 @@ export function estimateLayoutNodeWidth(node: Pick<MindMapNode, "metadata" | "ti
   return clamp(getNodeWidthOverride(node) ?? estimateLayoutTitleWidth(node.title) + NODE_HORIZONTAL_PADDING, MIN_NODE_WIDTH, MAX_NODE_WIDTH);
 }
 
+export function estimateLayoutNodeHeight(node: Pick<MindMapNode, "metadata" | "style" | "task" | "title">): number {
+  const width = estimateLayoutNodeWidth(node);
+  const contentWidth = Math.max(1, width - NODE_HORIZONTAL_PADDING);
+  const lineCount = node.title
+    .split(/\r\n|\r|\n/)
+    .reduce((total, line) => total + Math.max(1, Math.ceil(estimateLayoutTitleWidth(line) / contentWidth)), 0);
+  const statusHeight = node.task ? 20 : 0;
+
+  return NODE_BASE_HEIGHT + (lineCount - 1) * NODE_LINE_HEIGHT + statusHeight;
+}
+
 function estimateNodeSize(node: MindMapNode) {
   const scale = node.style.scale ?? 1;
-  const textWidth = estimateLayoutTitleWidth(node.title) + NODE_HORIZONTAL_PADDING;
   const width = estimateLayoutNodeWidth(node);
-  const lineCount = Math.max(1, Math.ceil(textWidth / width));
-  const statusHeight = node.task ? 20 : 0;
-  const height = NODE_BASE_HEIGHT + (lineCount - 1) * NODE_LINE_HEIGHT + statusHeight;
+  const height = estimateLayoutNodeHeight(node);
 
   return {
     width: width * scale,
@@ -146,7 +155,7 @@ export function documentToLayoutGraph(document: MindMapDocument): LayoutGraph {
       id: node.id,
       parentId: node.parentId,
       width: estimateLayoutNodeWidth(node) * scale,
-      height: 56 * scale,
+      height: estimateLayoutNodeHeight(node) * scale,
       position: { ...node.position },
       data: {
         title: node.title,

@@ -109,6 +109,10 @@
   box-shadow: none;
 }
 
+.react-flow__node-mindNode {
+  overflow: visible;
+}
+
 .mmn-node--selected {
   border-color: var(--mmn-selected);
   box-shadow: 0 0 0 3px color-mix(in srgb, var(--mmn-selected) 18%, transparent);
@@ -135,28 +139,8 @@
   content: "";
 }
 
-.mmn-node--drop-reparent::before {
-  position: absolute;
-  bottom: -7px;
-  left: 8px;
-  z-index: 1;
-  width: calc(100% - 16px);
-  height: 4px;
-  background: var(--mmn-accent);
-  border-radius: 999px;
-  content: "";
-  transform: scaleX(0);
-  transform-origin: left;
-  animation: mmn-drop-dwell var(--mmn-drop-dwell-duration, 2s) linear forwards;
-}
-
 .mmn-node--drop-armed {
   outline-color: color-mix(in srgb, var(--mmn-accent) 72%, white);
-}
-
-.mmn-node--drop-armed::before {
-  transform: scaleX(1);
-  animation: none;
 }
 
 .mmn-node--drop-flash {
@@ -169,8 +153,11 @@
 }
 
 .mmn-node__title {
+  display: block;
   width: 100%;
+  min-height: 0;
   min-width: 0;
+  padding: 0;
   border: 0;
   background: transparent;
   color: inherit;
@@ -179,14 +166,20 @@
   font-weight: 600;
   letter-spacing: 0;
   line-height: 1.35;
+  overflow-wrap: anywhere;
+  text-align: left;
+  white-space: pre-wrap;
+}
+
+.mmn-node__title--editable {
+  resize: none;
+  overflow: hidden;
+  font-family: inherit;
 }
 
 .mmn-node__title--readonly {
   justify-content: flex-start;
   padding: 0;
-  text-align: left;
-  white-space: normal;
-  overflow-wrap: anywhere;
 }
 
 .mmn-node__title:focus {
@@ -288,15 +281,21 @@
     background 140ms ease;
 }
 
+.mmn-node__control:focus-visible {
+  outline: 2px solid var(--mmn-selected);
+  outline-offset: 2px;
+}
+
 .mmn-node:hover .mmn-node__control,
-.mmn-node:focus-within .mmn-node__control {
+.mmn-node:focus-within .mmn-node__control,
+.mmn-node__control:focus-visible {
   opacity: 1;
   pointer-events: auto;
 }
 
 .mmn-node__control--add {
   top: 50%;
-  right: -36px;
+  right: -30px;
   transform: translateY(-50%) scale(0.94);
 }
 
@@ -322,7 +321,7 @@
 
 .mmn-node--branch-left .mmn-node__control--add {
   right: auto;
-  left: -36px;
+  left: -30px;
 }
 
 .mmn-node--branch-left .mmn-node__control--collapse {
@@ -339,11 +338,11 @@
 }
 
 .mmn-node--branch-up .mmn-node__control--add {
-  top: -36px;
+  top: -30px;
 }
 
 .mmn-node--branch-down .mmn-node__control--add {
-  bottom: -36px;
+  bottom: -30px;
 }
 
 .mmn-node--branch-up:hover .mmn-node__control--add,
@@ -394,12 +393,6 @@
   color: var(--mmn-node-text);
   font-size: 12px;
   pointer-events: all;
-}
-
-@keyframes mmn-drop-dwell {
-  to {
-    transform: scaleX(1);
-  }
 }
 
 @keyframes mmn-drop-flash {

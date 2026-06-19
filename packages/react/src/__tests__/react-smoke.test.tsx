@@ -1,7 +1,7 @@
-import { cleanup, render, screen } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { asNodeId, createEmptyDocument, createNode, type MindMapDocument, type MindMapNode } from "@my-mind-node/core";
-import { getDropValidationReason, getSortInsertionIndex, getTopLevelMovableNodeIds } from "../drag-interactions";
+import { getDropIntentLabel, getDropValidationReason, getSortInsertionIndex, getTopLevelMovableNodeIds } from "../drag-interactions";
 import { documentToFlow } from "../document-to-flow";
 import { MindMapEditor } from "../MindMapEditor";
 import { MindMapViewer } from "../MindMapViewer";
@@ -71,13 +71,16 @@ describe("@my-mind-node/react", () => {
     expect(collapsed.data.showAddChildControl).toBe(false);
   });
 
-  it("exposes drag timing settings to CSS animations", () => {
+  it("exposes drag flash settings to CSS animations", () => {
     const document = createDocumentWithRootChildren();
     const { container } = render(<MindMapEditor value={document} dragInteraction={{ reparentDwellMs: 1234, flashDurationMs: 456 }} />);
     const editor = container.querySelector<HTMLElement>(".mmn-editor")!;
 
-    expect(editor.style.getPropertyValue("--mmn-drop-dwell-duration")).toBe("1234ms");
     expect(editor.style.getPropertyValue("--mmn-drop-flash-duration")).toBe("456ms");
+  });
+
+  it("describes center drop as immediate child movement", () => {
+    expect(getDropIntentLabel({ type: "reparent", targetId: asNodeId("target") })).toBe("Drop to add as child");
   });
 
   it("assigns automatic branch colors without overriding custom node colors", () => {
@@ -138,5 +141,18 @@ describe("@my-mind-node/react", () => {
     expect(getDropValidationReason(document, [asNodeId("first")], childId, "reparent")).toMatch(/descendant/);
     expect(getSortInsertionIndex(document, asNodeId("second"), [asNodeId("first")], "before")).toBe(0);
     expect(getSortInsertionIndex(document, asNodeId("second"), [asNodeId("first")], "after")).toBe(1);
+  });
+
+  it("preserves newline titles from the node title editor", () => {
+    const document = createEmptyDocument({ rootTitle: "Root" });
+    const onChange = vi.fn();
+    render(<MindMapEditor value={document} onChange={onChange} />);
+
+    const title = screen.getByLabelText("Title for Root");
+    fireEvent.change(title, { target: { value: "Line one\nLine two" } });
+    fireEvent.blur(title);
+
+    const nextDocument = onChange.mock.calls.at(-1)?.[0] as MindMapDocument;
+    expect(nextDocument.nodes[nextDocument.rootId]!.title).toBe("Line one\nLine two");
   });
 });

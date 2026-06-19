@@ -44,24 +44,24 @@
 
 ### 功能 4: 即时拖放与排序返工
 
-- [ ] T-015: 返工 T-005 的中心区入子逻辑，移除 2 秒等待门槛，改为拖到目标节点中心区域后 mouseup 立即提交 `node.moveMany` ~45min
-- [ ] T-016: 修复目标节点上方/下方排序释放后还原的问题，确保同级 `children` 顺序、React Flow 节点状态和 `onChange` JSON 一致更新 ~45min
+- [x] T-015: 返工 T-005 的中心区入子逻辑，移除 2 秒等待门槛，改为拖到目标节点中心区域后 mouseup 立即提交 `node.moveMany` ~45min
+- [x] T-016: 修复目标节点上方/下方排序释放后还原的问题，确保同级 `children` 顺序、React Flow 节点状态和 `onChange` JSON 一致更新 ~45min
 
 ### 功能 5: 标题编辑、换行与布局稳定
 
-- [ ] T-017: 在节点标题编辑提交后重新测量节点尺寸并调度一次自动布局，覆盖长标题导致节点重叠或连线穿过标题的问题 ~1h
-- [ ] T-018: 支持节点标题换行输入、保存和展示，保留 `MindMapNode.title` 中的 `\n`，并让节点容器随多行内容自动增高 ~1h
-- [ ] T-019: 修复根节点长标题或 100 节点 fixture 下展示不全的问题，调整根节点尺寸、bounds 计算和 `fitView` padding ~45min
+- [x] T-017: 在节点标题编辑提交后重新测量节点尺寸并调度一次自动布局，覆盖长标题导致节点重叠或连线穿过标题的问题 ~1h
+- [x] T-018: 支持节点标题换行输入、保存和展示，保留 `MindMapNode.title` 中的 `\n`，并让节点容器随多行内容自动增高 ~1h
+- [x] T-019: 修复根节点长标题或 100 节点 fixture 下展示不全的问题，调整根节点尺寸、bounds 计算和 `fitView` padding ~45min
 
 ### 功能 6: Hover 控件命中
 
-- [ ] T-020: 修复节点左右侧/连线侧 hover 按钮必须先选中节点才能点击的问题，补齐 hover/focus 可见性、`pointer-events`、`z-index`、`nodrag` / `nopan` 处理 ~45min
+- [x] T-020: 修复节点左右侧/连线侧 hover 按钮必须先选中节点才能点击的问题，补齐 hover/focus 可见性、`pointer-events`、`z-index`、`nodrag` / `nopan` 处理 ~45min
 
 ### v2 集成与测试
 
-- [ ] T-021: 补充 React 组件测试，覆盖即时入子、同级排序提交、标题换行渲染、编辑后布局调度和 hover 控件点击回调 ~1h
-- [ ] T-022: 补充 Playwright E2E，覆盖截图反馈场景：拖到中心释放即入子、拖到上/下释放排序、编辑长标题后不乱排、多行标题、根节点完整展示、hover 直接点按钮 ~1h
-- [ ] T-023: 运行 `pnpm typecheck`、`pnpm test`、`pnpm e2e`、`git diff --check` 并修复 v2 返工发现的问题 ~1h
+- [x] T-021: 补充 React 组件测试，覆盖即时入子、同级排序提交、标题换行渲染、编辑后布局调度和 hover 控件点击回调 ~1h
+- [x] T-022: 补充 Playwright E2E，覆盖截图反馈场景：拖到中心释放即入子、拖到上/下释放排序、编辑长标题后不乱排、多行标题、根节点完整展示、hover 直接点按钮 ~1h
+- [x] T-023: 运行 `pnpm typecheck`、`pnpm test`、`pnpm e2e`、`git diff --check` 并修复 v2 返工发现的问题 ~1h
 
 ## 依赖关系
 

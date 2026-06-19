@@ -2,7 +2,7 @@ import { getAncestorIds, getDescendantIds, type MindMapDocument, type NodeId } f
 
 export type DropIntent =
   | { type: "none" }
-  | { type: "reparent"; targetId: NodeId; armed: boolean }
+  | { type: "reparent"; targetId: NodeId; armed?: boolean }
   | { type: "sort-before"; targetId: NodeId }
   | { type: "sort-after"; targetId: NodeId }
   | { type: "invalid"; targetId?: NodeId; reason: string };
@@ -89,7 +89,7 @@ export function getSortInsertionIndex(
 }
 
 export function getDropIntentLabel(intent: DropIntent): string | undefined {
-  if (intent.type === "reparent") return intent.armed ? "Drop to add as child" : "Hold to add as child";
+  if (intent.type === "reparent") return "Drop to add as child";
   if (intent.type === "sort-before") return "Insert before this node";
   if (intent.type === "sort-after") return "Insert after this node";
   if (intent.type === "invalid") return intent.reason;

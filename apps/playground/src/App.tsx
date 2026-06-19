@@ -126,7 +126,7 @@ export default function App() {
           </div>
           {tab === "json" ? (
             <>
-              <textarea value={json} onChange={(event) => setJson(event.target.value)} spellCheck={false} />
+              <textarea aria-label="Mind map JSON" value={json} onChange={(event) => setJson(event.target.value)} spellCheck={false} />
               <div className="actions">
                 <button type="button" onClick={applyJson}>
                   Apply
