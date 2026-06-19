@@ -113,6 +113,30 @@ test("markdown data mode applies markdown instead of parsing it as json", async 
     .toBe("Edited map>Alpha>Beta");
 });
 
+test("mermaid data mode applies mindmap syntax", async ({ page }) => {
+  await page.goto("/");
+  await page.getByRole("button", { name: "Mermaid" }).click();
+  await page
+    .getByLabel("Mind map Mermaid")
+    .fill("mindmap\n  root((Edited map))\n    Professional terminal\n      Ghostty");
+  await page.getByRole("button", { name: "Apply" }).click();
+
+  await expect(page.getByText(/UNSUPPORTED_MERMAID|EMPTY_MERMAID/)).toHaveCount(0);
+  await expect(page.getByLabel("Title for Edited map")).toBeVisible();
+  await expect(page.getByLabel("Title for Professional terminal")).toBeVisible();
+  await expect(page.getByLabel("Title for Ghostty")).toBeVisible();
+  await page.getByRole("button", { name: "JSON" }).click();
+  await expect
+    .poll(async () => {
+      const document = await getPlaygroundDocument(page);
+      const root = document.nodes[document.rootId];
+      const terminal = root?.children[0] ? document.nodes[root.children[0]] : undefined;
+      const ghostty = terminal?.children[0] ? document.nodes[terminal.children[0]] : undefined;
+      return [root?.title, terminal?.title, ghostty?.title].join(">");
+    })
+    .toBe("Edited map>Professional terminal>Ghostty");
+});
+
 test("json data mode falls back to markdown when markdown is pasted", async ({ page }) => {
   await page.goto("/");
   await page.getByLabel("Mind map JSON").fill(`# 100 node map

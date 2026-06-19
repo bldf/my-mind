@@ -14,7 +14,7 @@ import { MindMapEditor, OutlineEditor } from "@my-mind-node/react";
 import { useEffect, useMemo, useState } from "react";
 import fixture from "../../../tests/fixtures/100-nodes.json";
 
-type TextFormat = Extract<ImportFormat, "json" | "markdown">;
+type TextFormat = Extract<ImportFormat, "json" | "markdown" | "mermaid">;
 type DataTab = TextFormat | "outline";
 
 const BRANCH_PALETTES = {
@@ -37,11 +37,17 @@ function formatError(error: MindMapError): string {
 }
 
 function getTextareaLabel(format: TextFormat): string {
-  return format === "json" ? "Mind map JSON" : "Mind map Markdown";
+  if (format === "json") return "Mind map JSON";
+  if (format === "markdown") return "Mind map Markdown";
+  return "Mind map Mermaid";
 }
 
 function looksLikeMarkdown(value: string): boolean {
   return /^\s{0,3}#{1,6}\s+\S/m.test(value) || /^\s*(?:[-*+]|\d+\.)\s+\S/m.test(value);
+}
+
+function looksLikeMermaid(value: string): boolean {
+  return /^\s*(?:```mermaid\s*)?mindmap\s*$/im.test(value);
 }
 
 function applyBranchPresentation(document: MindMapDocument): MindMapDocument {
@@ -123,14 +129,14 @@ export default function App() {
       return;
     }
 
-    const syncMarkdown = async () => {
-      const result = await exportMindMap(document, "markdown");
+    const syncText = async () => {
+      const result = await exportMindMap(document, tab);
       if (cancelled) return;
       if (result.ok) setEditorText(String(result.value));
       else setError(formatError(result.error));
     };
 
-    void syncMarkdown();
+    void syncText();
 
     return () => {
       cancelled = true;
@@ -151,14 +157,17 @@ export default function App() {
     if (tab === "outline") return;
 
     let parsed = await importMindMap(editorText, tab);
-    if (
-      !parsed.ok &&
-      tab === "json" &&
-      parsed.error.code === "INVALID_JSON" &&
-      looksLikeMarkdown(editorText)
-    ) {
-      parsed = await importMindMap(editorText, "markdown");
-      if (parsed.ok) setTab("markdown");
+    if (!parsed.ok) {
+      const fallbackFormat =
+        tab !== "mermaid" && looksLikeMermaid(editorText)
+          ? "mermaid"
+          : tab !== "markdown" && looksLikeMarkdown(editorText)
+            ? "markdown"
+            : undefined;
+      if (fallbackFormat) {
+        parsed = await importMindMap(editorText, fallbackFormat);
+        if (parsed.ok) setTab(fallbackFormat);
+      }
     }
 
     if (!parsed.ok) {
@@ -185,13 +194,20 @@ export default function App() {
             </button>
             <button
               type="button"
+              aria-selected={tab === "mermaid"}
+              onClick={() => selectTab("mermaid")}
+            >
+              Mermaid
+            </button>
+            <button
+              type="button"
               aria-selected={tab === "outline"}
               onClick={() => selectTab("outline")}
             >
               Outline
             </button>
           </div>
-          {tab === "json" || tab === "markdown" ? (
+          {tab === "json" || tab === "markdown" || tab === "mermaid" ? (
             <>
               <textarea
                 aria-label={getTextareaLabel(tab)}

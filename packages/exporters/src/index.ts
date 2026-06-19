@@ -1,7 +1,7 @@
 import { exportIndentedText, serializeDocument } from "@my-mind-node/core";
 import type { MindMapDocument, MindMapError, NodeId } from "@my-mind-node/core";
 
-export type ExportFormat = "json" | "markdown" | "opml" | "indented-text" | "png" | "svg";
+export type ExportFormat = "json" | "markdown" | "mermaid" | "opml" | "indented-text" | "png" | "svg";
 
 export interface ExportOptions {
   title?: string;
@@ -49,6 +49,32 @@ function exportOpmlNode(document: MindMapDocument, nodeId: NodeId, depth: number
   lines.push(`${indent}<outline text="${escapeXml(node.title)}">`);
   for (const childId of node.children) exportOpmlNode(document, childId, depth + 1, lines);
   lines.push(`${indent}</outline>`);
+}
+
+function escapeMermaidLabel(value: string): string {
+  return escapeXml(value.replace(/\s+/g, " ").trim() || "Untitled");
+}
+
+function exportMermaidNode(
+  document: MindMapDocument,
+  nodeId: NodeId,
+  depth: number,
+  lines: string[],
+  counter: { value: number },
+) {
+  const node = document.nodes[nodeId];
+  if (!node) return;
+
+  const indent = "  ".repeat(depth + 1);
+  if (depth === 0) {
+    lines.push(`${indent}root["${escapeMermaidLabel(node.title)}"]`);
+  } else {
+    const id = `node${counter.value}`;
+    counter.value += 1;
+    lines.push(`${indent}${id}["${escapeMermaidLabel(node.title)}"]`);
+  }
+
+  for (const childId of node.children) exportMermaidNode(document, childId, depth + 1, lines, counter);
 }
 
 function exportSvg(document: MindMapDocument, options: ExportOptions = {}): string {
@@ -130,6 +156,11 @@ export async function exportMindMap(
     if (format === "markdown") {
       const lines: string[] = [];
       exportMarkdownNode(document, document.rootId, 0, lines);
+      return { ok: true, value: lines.join("\n") };
+    }
+    if (format === "mermaid") {
+      const lines = ["mindmap"];
+      exportMermaidNode(document, document.rootId, 0, lines, { value: 1 });
       return { ok: true, value: lines.join("\n") };
     }
     if (format === "opml") {

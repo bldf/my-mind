@@ -9,7 +9,7 @@ import {
 } from "@my-mind-node/core";
 import type { MindMapDocument, NodeId, ParseResult } from "@my-mind-node/core";
 
-export type ImportFormat = "json" | "markdown" | "opml" | "indented-text";
+export type ImportFormat = "json" | "markdown" | "mermaid" | "opml" | "indented-text";
 
 export interface ImportOptions {
   title?: string;
@@ -25,6 +25,8 @@ function escapeError<T = MindMapDocument>(code: string, message: string): ParseR
 type MarkdownEntry =
   | { kind: "node"; level: number; title: string; line: number }
   | { kind: "link"; label: string; level: number; line: number; url: string };
+
+type MermaidEntry = { indent: number; line: number; title: string };
 
 function parseMarkdownLink(value: string): { label: string; url: string } | undefined {
   const link = /^\[([^\]]+)\]\(([^)\s]+)\)$/.exec(value.trim());
@@ -158,6 +160,153 @@ function importMarkdown(
   return validateDocument(document);
 }
 
+function stripCodeFence(value: string): string {
+  const fenced = /^```(?:mermaid)?\s*\r?\n([\s\S]*?)\r?\n```$/i.exec(value.trim());
+  return fenced ? fenced[1] ?? "" : value;
+}
+
+function countLeadingSpaces(value: string, indentSize: number): number {
+  return (value.match(/^\s*/)?.[0] ?? "").replace(/\t/g, " ".repeat(indentSize)).length;
+}
+
+function stripSurroundingQuotes(value: string): string {
+  const text = value.trim();
+  const first = text[0];
+  const last = text[text.length - 1];
+  if ((first === '"' && last === '"') || (first === "'" && last === "'")) {
+    return text.slice(1, -1).trim();
+  }
+  return text;
+}
+
+function cleanMermaidNodeTitle(value: string): string {
+  const text = value
+    .trim()
+    .replace(/\s*:::[A-Za-z0-9_-]+\s*$/, "")
+    .replace(/<br\s*\/?>/gi, " ");
+  const id = "[A-Za-z_][\\w-]*";
+  const shapePatterns = [
+    new RegExp(`^(?:${id})?\\(\\((.+)\\)\\)$`),
+    new RegExp(`^(?:${id})?\\[\\[(.+)\\]\\]$`),
+    new RegExp(`^(?:${id})?\\{\\{(.+)\\}\\}$`),
+    new RegExp(`^(?:${id})?\\)\\)(.+)\\(\\($`),
+    new RegExp(`^(?:${id})?\\[(.+)\\]$`),
+    new RegExp(`^(?:${id})?\\)(.+)\\($`),
+    new RegExp(`^(?:${id})?\\((.+)\\)$`),
+  ];
+
+  for (const pattern of shapePatterns) {
+    const match = pattern.exec(text);
+    if (match?.[1]) return decodeEntities(stripSurroundingQuotes(match[1])) || "Untitled";
+  }
+
+  return decodeEntities(stripSurroundingQuotes(text)) || "Untitled";
+}
+
+function mermaidToEntries(mermaid: string, indentSize: number): ParseResult<MermaidEntry[]> {
+  const entries: MermaidEntry[] = [];
+  let foundMindmap = false;
+  let lineNumber = 0;
+
+  for (const rawLine of stripCodeFence(mermaid).split(/\r?\n/)) {
+    lineNumber += 1;
+    const trimmed = rawLine.trim();
+    if (!trimmed || trimmed.startsWith("%%")) continue;
+
+    if (!foundMindmap) {
+      if (/^mindmap\s*$/i.test(trimmed)) {
+        foundMindmap = true;
+        continue;
+      }
+      return escapeError("UNSUPPORTED_MERMAID", "Mermaid import currently supports mindmap diagrams");
+    }
+
+    if (trimmed.startsWith("::") || /^class(?:Def)?\b/.test(trimmed)) continue;
+    entries.push({
+      indent: countLeadingSpaces(rawLine, indentSize),
+      line: lineNumber,
+      title: cleanMermaidNodeTitle(trimmed),
+    });
+  }
+
+  if (!foundMindmap) return escapeError("EMPTY_MERMAID", "Mermaid input must start with a mindmap diagram");
+  if (entries.length === 0) return escapeError("EMPTY_MERMAID", "Mermaid mindmap contains no nodes");
+  return { ok: true, value: entries };
+}
+
+function importMermaid(
+  mermaid: string,
+  options: ImportOptions = {},
+): ParseResult<MindMapDocument> {
+  const parsed = mermaidToEntries(mermaid, options.indentSize ?? 2);
+  if (!parsed.ok) return parsed;
+
+  const includeRoot = options.includeRoot ?? true;
+  const rootEntry = parsed.value[0];
+  if (!rootEntry) return escapeError("EMPTY_MERMAID", "Mermaid mindmap contains no nodes");
+
+  const document = createEmptyDocument({
+    title: options.title ?? "Imported mind map",
+    rootTitle: includeRoot ? rootEntry.title : options.rootTitle ?? "Imported topics",
+  });
+  const stack: Array<{ indent: number; nodeId: NodeId }> = [
+    { indent: includeRoot ? rootEntry.indent : Number.NEGATIVE_INFINITY, nodeId: document.rootId },
+  ];
+  const startIndex = includeRoot ? 1 : 0;
+
+  for (let index = startIndex; index < parsed.value.length; index += 1) {
+    const entry = parsed.value[index];
+    if (!entry) continue;
+
+    while (stack.length > 0 && (stack[stack.length - 1]?.indent ?? 0) >= entry.indent) {
+      stack.pop();
+    }
+
+    const parentRef = stack[stack.length - 1];
+    if (!parentRef) {
+      return {
+        ok: false,
+        error: {
+          code: "MERMAID_ROOT_SIBLING",
+          message: `Line ${entry.line} must be nested under the mindmap root`,
+          path: `line.${entry.line}`,
+          recoverable: true,
+        },
+      };
+    }
+
+    const parent = document.nodes[parentRef.nodeId];
+    if (!parent) {
+      return {
+        ok: false,
+        error: {
+          code: "UNKNOWN_PARENT",
+          message: `Line ${entry.line} cannot find parent for indentation level`,
+          path: `line.${entry.line}`,
+          recoverable: true,
+        },
+      };
+    }
+
+    const level = Math.max(0, stack.length - 1);
+    const nodeId = asNodeId(createId("node"));
+    const node = createNode({
+      id: nodeId,
+      parentId: parentRef.nodeId,
+      title: entry.title,
+      position: {
+        x: (level + 1) * document.layout.gapX,
+        y: parent.children.length * document.layout.gapY,
+      },
+    });
+    document.nodes[nodeId] = node;
+    parent.children.push(nodeId);
+    stack.push({ indent: entry.indent, nodeId });
+  }
+
+  return validateDocument(document);
+}
+
 function decodeEntities(value: string): string {
   return value
     .replace(/&quot;/g, '"')
@@ -216,6 +365,7 @@ export async function importMindMap(
   if (format === "json") return parseDocument(text);
   if (format === "indented-text") return importIndentedText(text, options);
   if (format === "markdown") return importMarkdown(text, options);
+  if (format === "mermaid") return importMermaid(text, options);
   if (format === "opml") {
     const indented = opmlToIndentedText(text);
     if (!indented.ok) return indented;
@@ -233,6 +383,7 @@ export function importMindMapSync(
   if (format === "json") return parseDocument(input);
   if (format === "indented-text") return importIndentedText(input, options);
   if (format === "markdown") return importMarkdown(input, options);
+  if (format === "mermaid") return importMermaid(input, options);
   if (format === "opml") {
     const indented = opmlToIndentedText(input);
     if (!indented.ok) return indented;
