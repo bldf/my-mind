@@ -6,6 +6,7 @@ import {
   getNodeWidthOverride,
   type MindMapNode,
   type NodeId,
+  type NodeLink,
 } from "@my-mind-node/core";
 import { ChevronLeft, ChevronRight, Plus } from "lucide-react";
 import { memo, useCallback, useEffect, useRef, useState } from "react";
@@ -24,6 +25,7 @@ export interface MindNodeData extends Record<string, unknown> {
   readonly?: boolean;
   branchSide?: MindNodeBranchSide;
   dropIntent?: DropIntent;
+  link?: NodeLink;
   collapsedHiddenCount?: number;
   showAddChildControl?: boolean;
   showCollapseControl?: boolean;
@@ -39,6 +41,7 @@ export interface MindNodeData extends Record<string, unknown> {
   onAddChild?: (nodeId: NodeId) => void;
   onToggleCollapse?: (nodeId: NodeId) => void;
   onExpandCollapsed?: (nodeId: NodeId) => void;
+  onOpenLink?: (url: string, node: MindMapNode) => void;
   renderNode?: (node: MindMapNode, selected: boolean) => ReactNode;
 }
 
@@ -96,6 +99,7 @@ export const MindNode = memo(function MindNode(props: NodeProps) {
   const dropLabel = data.dropIntent ? getDropIntentLabel(data.dropIntent) : undefined;
   const collapsedHiddenCount = data.collapsedHiddenCount ?? 0;
   const hasCollapsedHiddenCount = collapsedHiddenCount > 0;
+  const link = data.link;
   const canShowAddChild =
     !data.readonly && data.showAddChildControl !== false && Boolean(data.onAddChild);
   const canShowCollapse =
@@ -111,6 +115,7 @@ export const MindNode = memo(function MindNode(props: NodeProps) {
     !data.readonly &&
     data.showNodeResizeControls !== false &&
     (Boolean(data.onResizeNode) || Boolean(data.onResizeCommit));
+  const linkLabel = link?.label ?? link?.url;
   const collapseLabel = node.collapsed ? "Expand node" : "Collapse node";
   const resizeStep = data.nodeResizeStep ?? 0.1;
 
@@ -230,6 +235,7 @@ export const MindNode = memo(function MindNode(props: NodeProps) {
         data.dropIntent?.type === "sort-before" ? "mmn-node--sort-before" : "",
         data.dropIntent?.type === "sort-after" ? "mmn-node--sort-after" : "",
         data.dropIntent?.type === "invalid" ? "mmn-node--drop-invalid" : "",
+        link ? "mmn-node--link" : "",
       ]
         .filter(Boolean)
         .join(" ")}
@@ -264,6 +270,21 @@ export const MindNode = memo(function MindNode(props: NodeProps) {
       />
       {data.renderNode ? (
         <div className="mmn-node__custom">{data.renderNode(node, Boolean(props.selected))}</div>
+      ) : data.readonly && link ? (
+        <button
+          className="mmn-node__title mmn-node__title--readonly mmn-node__title--link nodrag nopan"
+          type="button"
+          aria-label={`Open link ${linkLabel} from ${node.title}`}
+          onPointerDown={(event) => event.stopPropagation()}
+          onMouseDown={(event) => event.stopPropagation()}
+          onClick={(event) => {
+            event.preventDefault();
+            event.stopPropagation();
+            data.onOpenLink?.(link.url, node);
+          }}
+        >
+          {node.title}
+        </button>
       ) : data.readonly ? (
         <button
           className="mmn-node__title mmn-node__title--readonly"

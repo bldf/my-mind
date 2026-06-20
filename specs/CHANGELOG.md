@@ -1,5 +1,15 @@
 # Changelog
 
+## 2026-06-20 - Hyperlink Node Navigation
+
+完成 `11.hyperlink-node-navigation/`，让只读超链接节点与 Inspector links 共用安全打开路径：
+
+- 新增 React 层链接工具，支持 `node.links[0]` 优先、标题 URL 兜底、危险协议过滤和 `noopener,noreferrer` 默认新标签打开。
+- `documentToFlow` 向 `MindNode` 透传派生链接与 `onOpenLink`，只读链接节点点击打开链接，普通只读节点仍进入节点视图，编辑态 textarea 不误触跳转。
+- Inspector links 改为复用统一 `openNodeLink`，宿主 `onOpenLink` 仍完全优先；默认路径通过 `onError` 报告不安全 URL 或 opener 异常。
+- playground 增加 `?readonly=1` 验证入口，并新增 Playwright E2E 使用 `window.open` spy 覆盖 Markdown link 节点点击。
+- `tasks.md` 共 11 个任务均已标记为 `[x]`。
+
 ## 2026-06-20 - Dark Mode & Live Playground Rendering
 
 完成 `10.dark-mode-live-playground-rendering/`，实现暗色模式视觉一致性与 playground 实时文本解析渲染：

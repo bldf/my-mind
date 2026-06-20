@@ -11,6 +11,7 @@ import {
   simpleTreeLayout,
   type MindMapDocument,
   type MindMapError,
+  type MindMapNode,
   type MindMapOperation,
   type MindMapTheme,
   type NodeId,
@@ -48,6 +49,7 @@ import {
 } from "./drag-interactions";
 import { documentToFlow, type FlowConversionResult } from "./document-to-flow";
 import { BezierEdge } from "./edges/BezierEdge";
+import { isSafeExternalUrl, openSafeExternalUrl } from "./link-utils";
 import { MindNode, type MindNodeData } from "./nodes/MindNode";
 import { resolveTheme, defaultThemes } from "./themes";
 import type { MindMapEditorProps, ViewToolbarControl } from "./types";
@@ -266,6 +268,35 @@ function EditorCanvas(props: MindMapEditorProps) {
       props.onError?.(error);
     },
     [props],
+  );
+
+  const openNodeLink = useCallback(
+    (url: string, node: MindMapNode) => {
+      if (props.onOpenLink) {
+        props.onOpenLink(url, node);
+        return;
+      }
+
+      if (!isSafeExternalUrl(url)) {
+        reportError({
+          code: "UNSAFE_LINK_URL",
+          message: "Link URL is not allowed",
+          details: { nodeId: node.id },
+          recoverable: true,
+        });
+        return;
+      }
+
+      if (!openSafeExternalUrl(url)) {
+        reportError({
+          code: "OPEN_LINK_FAILED",
+          message: "Link could not be opened",
+          details: { nodeId: node.id },
+          recoverable: true,
+        });
+      }
+    },
+    [props, reportError],
   );
 
   const commitSelection = useCallback(
@@ -507,6 +538,7 @@ function EditorCanvas(props: MindMapEditorProps) {
         onAddChild: addChildNode,
         onToggleCollapse: toggleNodeCollapse,
         onExpandCollapsed: expandCollapsedNode,
+        onOpenLink: openNodeLink,
         renderNode: props.renderNode,
         theme,
       }),
@@ -531,6 +563,7 @@ function EditorCanvas(props: MindMapEditorProps) {
       onResizeProgress,
       onResizeCommit,
       selection.nodeIds,
+      openNodeLink,
       toggleNodeCollapse,
       theme,
     ],
@@ -969,7 +1002,7 @@ function EditorCanvas(props: MindMapEditorProps) {
           document={document}
           selectedNodeId={selectedNodeId}
           readonly={readonly}
-          onOpenLink={props.onOpenLink}
+          onOpenLink={openNodeLink}
           onPatchNode={(nodeId, patch) =>
             runCommand({
               type: "node.update",

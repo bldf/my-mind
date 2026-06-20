@@ -206,6 +206,18 @@
   padding: 0;
 }
 
+.mmn-node--link .mmn-node__title--link {
+  cursor: pointer;
+  text-decoration-color: color-mix(in srgb, currentColor 55%, transparent);
+  text-decoration-line: underline;
+  text-decoration-thickness: 1px;
+  text-underline-offset: 3px;
+}
+
+.mmn-node--link .mmn-node__title--link:hover {
+  text-decoration-color: currentColor;
+}
+
 .mmn-node__title:focus {
   outline: 2px solid var(--mmn-selected);
   outline-offset: 3px;

@@ -185,6 +185,115 @@ describe("@my-mind-node/react", () => {
     expect(screen.queryByRole("button", { name: "Expand First, 2 hidden nodes" })).toBeNull();
   });
 
+  it("opens readonly link nodes without bubbling pointer, mouse, or click events", () => {
+    const node = createNode({
+      id: asNodeId("first"),
+      title: "Topic 88",
+      links: [{ url: "https://example.com", label: "Example" }],
+    });
+    const onOpenLink = vi.fn();
+    const onParentPointerDown = vi.fn();
+    const onParentMouseDown = vi.fn();
+    const onParentClick = vi.fn();
+    const props = {
+      id: String(node.id),
+      type: "mindNode",
+      selected: false,
+      data: {
+        node,
+        readonly: true,
+        link: { url: "https://example.com", label: "Example" },
+        onOpenLink,
+      },
+    } as unknown as NodeProps;
+
+    render(
+      <div
+        onPointerDown={onParentPointerDown}
+        onMouseDown={onParentMouseDown}
+        onClick={onParentClick}
+      >
+        <ReactFlowProvider>
+          <MindNode {...props} />
+        </ReactFlowProvider>
+      </div>,
+    );
+
+    const linkButton = screen.getByRole("button", {
+      name: "Open link Example from Topic 88",
+    });
+    linkButton.focus();
+    expect(document.activeElement).toBe(linkButton);
+
+    fireEvent.pointerDown(linkButton);
+    fireEvent.mouseDown(linkButton);
+    fireEvent.click(linkButton);
+
+    expect(onOpenLink).toHaveBeenCalledWith("https://example.com", node);
+    expect(onParentPointerDown).not.toHaveBeenCalled();
+    expect(onParentMouseDown).not.toHaveBeenCalled();
+    expect(onParentClick).not.toHaveBeenCalled();
+  });
+
+  it("keeps readonly non-link nodes entering node view", () => {
+    const node = createNode({ id: asNodeId("first"), title: "First" });
+    const onEnterNodeView = vi.fn();
+
+    renderMindNode({ node, readonly: true, onEnterNodeView });
+
+    fireEvent.click(screen.getByRole("button", { name: "First" }));
+
+    expect(onEnterNodeView).toHaveBeenCalledWith(asNodeId("first"));
+  });
+
+  it("does not open link data from the editable title textarea", () => {
+    const node = createNode({
+      id: asNodeId("first"),
+      title: "First",
+      links: [{ url: "https://example.com" }],
+    });
+    const onOpenLink = vi.fn();
+
+    renderMindNode({
+      node,
+      link: { url: "https://example.com" },
+      onOpenLink,
+    });
+
+    fireEvent.click(screen.getByLabelText("Title for First"));
+
+    expect(onOpenLink).not.toHaveBeenCalled();
+  });
+
+  it("derives link data in flow nodes without wrapping custom renderers", () => {
+    const document = createEmptyDocument({ rootTitle: "https://root.example" });
+    const childId = asNodeId("child");
+    document.nodes[document.rootId]!.children = [childId];
+    document.nodes[childId] = createNode({
+      id: childId,
+      parentId: document.rootId,
+      title: "Child",
+      links: [{ url: "https://example.com", label: "Example" }],
+    });
+    const onOpenLink = vi.fn();
+    const renderNode = vi.fn(() => <span>Custom</span>);
+
+    const flow = documentToFlow(document, { onOpenLink, renderNode });
+    const root = flow.nodes.find((node) => node.id === document.rootId)!;
+    const child = flow.nodes.find((node) => node.id === "child")!;
+
+    expect(root.data.link).toEqual({
+      url: "https://root.example",
+      label: "https://root.example",
+    });
+    expect(child.data.link).toEqual({
+      url: "https://example.com",
+      label: "Example",
+    });
+    expect(child.data.onOpenLink).toBe(onOpenLink);
+    expect(child.data.renderNode).toBe(renderNode);
+  });
+
   it("exposes drag flash settings to CSS animations", () => {
     const document = createDocumentWithRootChildren();
     const { container } = render(

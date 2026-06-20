@@ -16,6 +16,16 @@
 - `importMindMap`
 - `exportMindMap`
 
+## React callbacks
+
+### `onOpenLink`
+
+`MindMapEditor` and `MindMapViewer` call `onOpenLink(url, node)` when a readonly
+node title or inspector link is opened. If the host omits this callback, safe
+absolute `http:`, `https:`, `mailto:`, and `tel:` URLs open in a new tab with
+`noopener,noreferrer`; unsafe or unsupported URLs report a recoverable error
+through `onError`.
+
 ## Experimental
 
 - `renderNode`

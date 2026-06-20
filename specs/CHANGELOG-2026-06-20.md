@@ -1,5 +1,30 @@
 # 变更日志 — 2026-06-20
 
+## Feature 11: Hyperlink Node Navigation
+
+### 新增
+
+- 新增 React 层链接工具，支持从 `MindMapNode.links[0]` 派生主链接，并在无 links 但标题是安全绝对 URL 时兜底为可点击链接节点。
+- 只读 `MindNode` 链接节点标题渲染为可点击按钮，点击后调用宿主 `onOpenLink(url, node)`；宿主未接管时默认以 `noopener,noreferrer` 新标签打开安全 URL。
+- Inspector links 与画布链接节点共用统一 `openNodeLink` 路径，危险协议或 opener 异常通过 `onError` 返回可恢复错误。
+- playground 支持 `?readonly=1` 只读渲染路径，用于验证 Markdown link 导入后节点点击跳转。
+
+### 关键文件
+
+- `packages/react/src/link-utils.ts` — 新增链接派生、安全协议判断和默认打开工具。
+- `packages/react/src/MindMapEditor.tsx` — 新增统一 `openNodeLink` callback，并传入 `documentToFlow` 与 `InspectorPanel`。
+- `packages/react/src/document-to-flow.ts` — 为 flow node data 派生 `link` 并透传 `onOpenLink`。
+- `packages/react/src/nodes/MindNode.tsx` — 只读链接节点标题可点击，同时保留普通只读节点进入节点视图行为。
+- `packages/react/src/styles.css` — 新增链接节点低干扰视觉提示。
+- `packages/react/src/__tests__/link-utils.test.ts` 与 `packages/react/src/__tests__/react-smoke.test.tsx` — 覆盖 URL 安全、链接节点点击、事件隔离和 flow data 派生。
+- `tests/e2e/playground.spec.ts` — 新增 readonly Markdown link 节点点击 E2E，使用 `window.open` spy 避免真实外部访问。
+
+### 架构决策
+
+- 不改变 `MindMapDocument` 持久化 schema；标题 URL 兜底只在 React 渲染层派生，不回写 `node.links`。
+- 默认打开只允许 `http:`、`https:`、`mailto:`、`tel:`，相对路径和跨文档路由交给宿主 `onOpenLink` 接管。
+- 自定义 `renderNode` 不被库强制包裹，只通过 flow node data 暴露 link 与打开回调，避免破坏宿主自定义节点交互。
+
 ## Feature 10: Dark Mode Live Playground Rendering
 
 ### 新增

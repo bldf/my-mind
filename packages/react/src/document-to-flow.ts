@@ -3,6 +3,7 @@ import type { MindMapDocument, MindMapNode, NodeId, MindMapTheme } from "@my-min
 import type { ReactNode } from "react";
 import type { Edge, Node } from "@xyflow/react";
 import type { DropIntent, MindNodeBranchSide } from "./drag-interactions";
+import { getPrimaryNodeLink } from "./link-utils";
 import type { MindNodeData } from "./nodes/MindNode";
 
 interface BranchPalette {
@@ -29,6 +30,7 @@ export interface FlowConversionOptions {
   onAddChild?: (nodeId: NodeId) => void;
   onToggleCollapse?: (nodeId: NodeId) => void;
   onExpandCollapsed?: (nodeId: NodeId) => void;
+  onOpenLink?: (url: string, node: MindMapNode) => void;
   showNodeResizeControls?: boolean;
   nodeResizeStep?: number;
   nodeMinScale?: number;
@@ -293,6 +295,7 @@ export function documentToFlow(
         readonly: options.readonly,
         branchSide: getBranchSide(document, node, viewRootId),
         dropIntent: getNodeDropIntent(options.dropIntent, node.id),
+        link: getPrimaryNodeLink(node),
         collapsedHiddenCount: getCollapsedHiddenCount(document, node),
         showAddChildControl: options.showAddChildControl !== false && !node.collapsed,
         showCollapseControl: options.showCollapseControl,
@@ -308,6 +311,7 @@ export function documentToFlow(
         onAddChild: options.onAddChild,
         onToggleCollapse: options.onToggleCollapse,
         onExpandCollapsed: options.onExpandCollapsed,
+        onOpenLink: options.onOpenLink,
         renderNode: options.renderNode,
       },
     };

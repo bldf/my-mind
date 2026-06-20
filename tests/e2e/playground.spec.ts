@@ -179,6 +179,49 @@ test("json data mode falls back to markdown when markdown is pasted", async ({ p
     });
 });
 
+test("readonly markdown link nodes open through the safe default opener", async ({
+  page,
+  isMobile,
+}) => {
+  test.skip(isMobile, "Readonly link navigation is covered in desktop browser E2E.");
+
+  await page.addInitScript(() => {
+    const openedLinks: Array<{ features?: string; target?: string; url: string }> = [];
+    Object.defineProperty(window, "__openedLinks", {
+      configurable: true,
+      value: openedLinks,
+    });
+    window.open = ((url?: string | URL, target?: string, features?: string) => {
+      openedLinks.push({ url: String(url), target, features });
+      return null;
+    }) as typeof window.open;
+  });
+
+  await page.goto("/?readonly=1");
+  await page.getByRole("button", { name: "Markdown" }).click();
+  await page.getByLabel("Mind map Markdown").fill(`# Link map
+- Topic 1
+  - Topic 88
+    - [Example](https://example.com)`);
+
+  const linkNode = page.getByRole("button", { name: "Open link Example from Topic 88" });
+  await expect(linkNode).toBeVisible();
+  await linkNode.click();
+  await expect(page.getByText(/OPEN_LINK_FAILED/)).toHaveCount(0);
+
+  await expect
+    .poll(async () =>
+      page.evaluate(() => (window as unknown as { __openedLinks: unknown[] }).__openedLinks),
+    )
+    .toEqual([
+      {
+        url: "https://example.com",
+        target: "_blank",
+        features: "noopener,noreferrer",
+      },
+    ]);
+});
+
 test("invalid input does not cover valid document and error disappears on fix", async ({ page }) => {
   await page.goto("/");
   await expect(page.getByLabel("Title for 100 node map")).toBeVisible();

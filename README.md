@@ -8,7 +8,7 @@ editing, importing, exporting, and documenting structured mind map data.
 This repository is a pnpm workspace:
 
 - `packages/core` — DOM-free schema, validation, commands, history, layout graph conversion, search, JSON and indented-text serialization.
-- `packages/react` — React Flow editor/viewer, drag-to-reparent/sort interactions, collapsed-branch count controls, corner node resize handles, hover add/collapse controls, toolbar, themes, breadcrumbs, outline editor, search panel, inspector, node sizing, and E2E-facing styles.
+- `packages/react` — React Flow editor/viewer, safe hyperlink node opening, drag-to-reparent/sort interactions, collapsed-branch count controls, corner node resize handles, hover add/collapse controls, toolbar, themes, breadcrumbs, outline editor, search panel, inspector, node sizing, and E2E-facing styles.
 - `packages/importers` — optional JSON, Markdown, OPML, and indented-text import package.
 - `packages/exporters` — optional JSON, Markdown, OPML, indented-text, SVG, and browser PNG export package.
 - `apps/playground` — Vite playground with JSON editing and live preview.

@@ -14,3 +14,8 @@ or disable those defaults.
 
 `OutlineEditor` can be used beside the canvas. Both views update the same
 `MindMapDocument` through core commands.
+
+Readonly nodes with `node.links[0]` are rendered as link buttons. If a node has
+no links but its title is a safe absolute URL, the title is treated as the
+primary link. Use `onOpenLink` to route links through host navigation,
+permissions, analytics, or custom security checks.

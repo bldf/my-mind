@@ -20,3 +20,7 @@
 
 - **Mount 时的防抖自动导入冲突**: 首次加载页面时，若 `lastSyncedTextRef` 和 `lastImportedTextRef` 默认为空，组件渲染后 300ms 会自动触发一次导入解析，并调用 `setDocument` 重置文档。在 E2E 测试等场景下，如果在 mount 瞬间开始节点拖拽，这 300ms 的文档重置会导致 React Flow 的节点被销毁重建，从而切断拖拽中的 Pointer Session 并使测试失败。
 - **解决方法**: 在 `App.tsx` 中把 refs 的初始值设置为 initialDocument 序列化后的文本，使得 on mount 时的 `editorText === lastSyncedTextRef.current` 成立，完美规避初始多余的 debounced import 触发。
+
+## 2026-06-20 - Hyperlink Node Navigation / readonly playground E2E path
+
+- `apps/playground` 支持 `?readonly=1` 查询参数：数据面板仍可导入 JSON/Markdown/Mermaid，右侧画布以 `MindMapEditor readonly` 渲染。后续需要验证 Viewer/readonly-only 交互时可复用该路径，不必为 E2E 额外启动 readonly example dev server。

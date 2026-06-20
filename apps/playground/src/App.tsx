@@ -86,6 +86,10 @@ function applyBranchPresentation(document: MindMapDocument): MindMapDocument {
 }
 
 export default function App() {
+  const readonlyMode = useMemo(() => {
+    if (typeof window === "undefined") return false;
+    return new URLSearchParams(window.location.search).get("readonly") === "1";
+  }, []);
   const initialDocument = useMemo(() => {
     const parsed = parseDocument(JSON.stringify(fixture));
     if (!parsed.ok) throw new Error(parsed.error.message);
@@ -234,12 +238,13 @@ export default function App() {
           <MindMapEditor
             value={document}
             height="100%"
+            readonly={readonlyMode}
             breadcrumbs={{ hidden: true }}
             inspector={{ hidden: true }}
             toolbar={{
               controls: ["theme", "search", "fullscreen", "zoomOut", "zoomIn", "fitView", "export"],
             }}
-            onChange={updateDocument}
+            onChange={readonlyMode ? undefined : updateDocument}
             onError={(mindMapError) => setError(`${mindMapError.code}: ${mindMapError.message}`)}
           />
         </section>
