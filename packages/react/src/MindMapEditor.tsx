@@ -508,6 +508,7 @@ function EditorCanvas(props: MindMapEditorProps) {
         onToggleCollapse: toggleNodeCollapse,
         onExpandCollapsed: expandCollapsedNode,
         renderNode: props.renderNode,
+        theme,
       }),
     [
       addChildNode,
@@ -531,6 +532,7 @@ function EditorCanvas(props: MindMapEditorProps) {
       onResizeCommit,
       selection.nodeIds,
       toggleNodeCollapse,
+      theme,
     ],
   );
 
@@ -882,6 +884,7 @@ function EditorCanvas(props: MindMapEditorProps) {
       style={style}
       onKeyDown={onKeyDown}
       tabIndex={0}
+      data-theme-mode={theme.mode ?? "light"}
     >
       {!props.breadcrumbs?.hidden ? (
         <Breadcrumbs

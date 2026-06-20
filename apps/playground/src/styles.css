@@ -46,9 +46,9 @@ textarea {
 
 .segmented {
   display: inline-grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
+  grid-template-columns: repeat(4, minmax(0, 1fr));
   gap: 2px;
-  width: min(100%, 360px);
+  width: min(100%, 420px);
   padding: 3px;
   background: #e5e7eb;
   border-radius: 8px;

@@ -16,24 +16,24 @@
 
 ### 功能 1: 暗黑模式视觉一致性
 
-- [ ] T-001: 在 `MindMapEditor.tsx` 中为 `.mmn-editor` 增加 theme mode 标识，并把当前 `theme` 传入 `documentToFlow` ~15min
-- [ ] T-002: 扩展 `document-to-flow.ts` 的 `FlowConversionOptions`，实现 light/dark theme 感知的根节点默认样式与自动分支 palette，保持自定义节点 style 优先 ~30min
-- [ ] T-003: 重构 `packages/react/src/styles.css` 的浅色硬编码，新增 surface/border/muted/shadow/control/error 等语义 CSS token，并为 dark mode 覆盖 token ~45min
-- [ ] T-004: 补齐 toolbar、breadcrumbs、theme/search/inspector panel、outline、inputs、edge label、node controls、collapsed count、resize handle、empty state 的暗色样式 ~45min
-- [ ] T-005: 调整 `MiniMap` 暗色模式视觉，使背景、mask、节点和边在 `Graphite` 下清晰可辨 ~15min
+- [x] T-001: 在 `MindMapEditor.tsx` 中为 `.mmn-editor` 增加 theme mode 标识，并把当前 `theme` 传入 `documentToFlow` ~15min
+- [x] T-002: 扩展 `document-to-flow.ts` 的 `FlowConversionOptions`，实现 light/dark theme 感知的根节点默认样式与自动分支 palette，保持自定义节点 style 优先 ~30min
+- [x] T-003: 重构 `packages/react/src/styles.css` 的浅色硬编码，新增 surface/border/muted/shadow/control/error 等语义 CSS token，并为 dark mode 覆盖 token ~45min
+- [x] T-004: 补齐 toolbar、breadcrumbs、theme/search/inspector panel、outline、inputs、edge label、node controls、collapsed count、resize handle、empty state 的暗色样式 ~45min
+- [x] T-005: 调整 `MiniMap` 暗色模式视觉，使背景、mask、节点和边在 `Graphite` 下清晰可辨 ~15min
 
 ### 功能 2: playground 实时渲染
 
-- [ ] T-006: 重构 `apps/playground/src/App.tsx` 的 `applyEditorText` 为可复用 import 函数，支持成功清错、失败保留当前 document、fallback 自动切换 tab ~30min
-- [ ] T-007: 增加 JSON/Markdown/Mermaid 文本输入的防抖实时解析 effect，并通过 ref 避免 document -> text 同步触发循环导入 ~45min
-- [ ] T-008: 删除 playground 底部 `Apply` 按钮，保留 `Import` 立即解析入口并修正 `.segmented` 四个 tab 的布局 ~15min
+- [x] T-006: 重构 `apps/playground/src/App.tsx` 的 `applyEditorText` 为可复用 import 函数，支持成功清错、失败保留当前 document、fallback 自动切换 tab ~30min
+- [x] T-007: 增加 JSON/Markdown/Mermaid 文本输入的防抖实时解析 effect，并通过 ref 避免 document -> text 同步触发循环导入 ~45min
+- [x] T-008: 删除 playground 底部 `Apply` 按钮，保留 `Import` 立即解析入口并修正 `.segmented` 四个 tab 的布局 ~15min
 
 ### 测试与验证
 
-- [ ] T-009: 更新/新增 React 单元测试，覆盖 dark theme 默认节点/分支配色和自定义节点颜色不被覆盖 ~30min
-- [ ] T-010: 更新现有 Playwright E2E，移除对 `Apply` 的点击依赖，改为等待实时渲染结果 ~30min
-- [ ] T-011: 新增 Playwright E2E 覆盖 `Apply` 不存在、invalid input 不覆盖当前导图、`Graphite` 暗色模式关键元素颜色变化 ~45min
-- [ ] T-012: 运行 `pnpm typecheck`、`pnpm test`、`pnpm e2e` 和 `git diff --check`，修复验证问题 ~30min
+- [x] T-009: 更新/新增 React 单元测试，覆盖 dark theme 默认节点/分支配色和自定义节点颜色不被覆盖 ~30min
+- [x] T-010: 更新现有 Playwright E2E，移除对 `Apply` 的点击依赖，改为等待实时渲染结果 ~30min
+- [x] T-011: 新增 Playwright E2E 覆盖 `Apply` 不存在、invalid input 不覆盖当前导图、`Graphite` 暗色模式关键元素颜色变化 ~45min
+- [x] T-012: 运行 `pnpm typecheck`、`pnpm test`、`pnpm e2e` 和 `git diff --check`，修复验证问题 ~30min
 
 ## 依赖关系
 

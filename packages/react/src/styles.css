@@ -5,12 +5,23 @@
   --mmn-edge: #758195;
   --mmn-selected: #2563eb;
   --mmn-accent: #0f766e;
+
+  /* Semantic tokens */
+  --mmn-surface: var(--mmn-node);
+  --mmn-surface-muted: rgba(15, 23, 42, 0.04);
+  --mmn-border: rgba(17, 24, 39, 0.12);
+  --mmn-border-strong: rgba(17, 24, 39, 0.24);
+  --mmn-muted-text: #64748b;
+  --mmn-shadow: 0 6px 20px rgba(15, 23, 42, 0.08);
+  --mmn-control-hover: rgba(37, 99, 235, 0.1);
+  --mmn-danger: #b91c1c;
+
   position: relative;
   min-height: 420px;
   overflow: hidden;
   background: var(--mmn-canvas);
   color: var(--mmn-node-text);
-  border: 1px solid rgba(17, 24, 39, 0.12);
+  border: 1px solid var(--mmn-border);
   border-radius: 8px;
   font-family:
     Inter,
@@ -20,6 +31,17 @@
     BlinkMacSystemFont,
     "Segoe UI",
     sans-serif;
+}
+
+.mmn-editor[data-theme-mode="dark"] {
+  --mmn-surface: var(--mmn-node);
+  --mmn-surface-muted: color-mix(in srgb, var(--mmn-node-text) 6%, transparent);
+  --mmn-border: color-mix(in srgb, var(--mmn-node-text) 14%, transparent);
+  --mmn-border-strong: color-mix(in srgb, var(--mmn-node-text) 24%, transparent);
+  --mmn-muted-text: color-mix(in srgb, var(--mmn-node-text) 60%, transparent);
+  --mmn-shadow: 0 8px 32px rgba(0, 0, 0, 0.5);
+  --mmn-control-hover: color-mix(in srgb, var(--mmn-selected) 16%, transparent);
+  --mmn-danger: #ef4444;
 }
 
 .mmn-breadcrumbs {
@@ -32,10 +54,10 @@
   align-items: center;
   max-width: min(55%, 720px);
   padding: 4px 8px;
-  background: color-mix(in srgb, var(--mmn-node) 92%, transparent);
-  border: 1px solid rgba(17, 24, 39, 0.1);
+  background: color-mix(in srgb, var(--mmn-surface) 92%, transparent);
+  border: 1px solid var(--mmn-border);
   border-radius: 8px;
-  box-shadow: 0 6px 20px rgba(15, 23, 42, 0.08);
+  box-shadow: var(--mmn-shadow);
 }
 
 .mmn-breadcrumbs button,
@@ -78,10 +100,10 @@
   display: flex;
   gap: 4px;
   padding: 4px;
-  background: color-mix(in srgb, var(--mmn-node) 92%, transparent);
-  border: 1px solid rgba(17, 24, 39, 0.1);
+  background: color-mix(in srgb, var(--mmn-surface) 92%, transparent);
+  border: 1px solid var(--mmn-border);
   border-radius: 8px;
-  box-shadow: 0 6px 20px rgba(15, 23, 42, 0.08);
+  box-shadow: var(--mmn-shadow);
 }
 
 .mmn-toolbar button:hover,
@@ -90,7 +112,7 @@
 .mmn-node__resize-handle:hover,
 .mmn-breadcrumbs button:hover,
 .mmn-outline button:hover {
-  background: rgba(37, 99, 235, 0.1);
+  background: var(--mmn-control-hover);
 }
 
 .mmn-node {
@@ -105,7 +127,7 @@
   padding: 8px 14px;
   transform-origin: center;
   background: var(--mmn-node);
-  border: 1px solid rgba(100, 116, 139, 0.16);
+  border: 1px solid var(--mmn-border);
   border-radius: 8px;
   color: var(--mmn-node-text);
   box-shadow: none;
@@ -150,7 +172,7 @@
 }
 
 .mmn-node--drop-invalid {
-  outline: 3px dashed rgba(185, 28, 28, 0.6);
+  outline: 3px dashed var(--mmn-danger);
   outline-offset: 5px;
 }
 
@@ -192,7 +214,7 @@
 .mmn-node__status {
   justify-self: start;
   padding: 2px 6px;
-  border: 1px solid rgba(17, 24, 39, 0.12);
+  border: 1px solid var(--mmn-border);
   border-radius: 999px;
   font-size: 11px;
   text-transform: uppercase;
@@ -211,10 +233,10 @@
   max-width: 190px;
   padding: 3px 7px;
   transform: translateX(-50%);
-  background: var(--mmn-node);
-  border: 1px solid rgba(17, 24, 39, 0.12);
+  background: var(--mmn-surface);
+  border: 1px solid var(--mmn-border);
   border-radius: 999px;
-  box-shadow: 0 8px 18px rgba(15, 23, 42, 0.14);
+  box-shadow: var(--mmn-shadow);
   color: var(--mmn-node-text);
   font-size: 11px;
   font-weight: 700;
@@ -272,9 +294,9 @@
   height: 28px;
   min-width: 28px;
   min-height: 28px;
-  background: var(--mmn-node);
-  border: 1px solid rgba(17, 24, 39, 0.12);
-  box-shadow: 0 8px 20px rgba(15, 23, 42, 0.14);
+  background: var(--mmn-surface);
+  border: 1px solid var(--mmn-border);
+  box-shadow: var(--mmn-shadow);
   opacity: 0;
   pointer-events: none;
   transition:
@@ -364,10 +386,10 @@
   min-height: 24px;
   padding: 0 7px;
   transform: translateY(-50%);
-  background: var(--mmn-node);
-  border: 1px solid rgba(17, 24, 39, 0.1);
+  background: var(--mmn-surface);
+  border: 1px solid var(--mmn-border);
   border-radius: 999px;
-  box-shadow: 0 8px 20px rgba(15, 23, 42, 0.12);
+  box-shadow: var(--mmn-shadow);
   color: var(--mmn-selected);
   font-size: 11px;
   font-weight: 800;
@@ -413,10 +435,10 @@
   min-width: 18px;
   min-height: 18px;
   padding: 0;
-  background: var(--mmn-node);
-  border: 1px solid color-mix(in srgb, var(--mmn-selected) 72%, white);
+  background: var(--mmn-surface);
+  border: 1px solid color-mix(in srgb, var(--mmn-selected) 72%, var(--mmn-surface));
   border-radius: 999px;
-  box-shadow: 0 6px 16px rgba(15, 23, 42, 0.16);
+  box-shadow: var(--mmn-shadow);
 }
 
 .mmn-node__resize-handle span {
@@ -477,8 +499,8 @@
 .mmn-edge-label {
   position: absolute;
   padding: 2px 6px;
-  background: var(--mmn-node);
-  border: 1px solid rgba(17, 24, 39, 0.12);
+  background: var(--mmn-surface);
+  border: 1px solid var(--mmn-border);
   border-radius: 999px;
   color: var(--mmn-node-text);
   font-size: 12px;
@@ -510,10 +532,10 @@
   z-index: 14;
   right: 12px;
   width: min(320px, calc(100% - 24px));
-  background: var(--mmn-node);
-  border: 1px solid rgba(17, 24, 39, 0.12);
+  background: var(--mmn-surface);
+  border: 1px solid var(--mmn-border);
   border-radius: 8px;
-  box-shadow: 0 20px 50px rgba(15, 23, 42, 0.18);
+  box-shadow: var(--mmn-shadow);
 }
 
 .mmn-theme-panel {
@@ -550,7 +572,7 @@
   gap: 10px;
   width: 100%;
   padding: 8px !important;
-  border: 1px solid rgba(17, 24, 39, 0.1) !important;
+  border: 1px solid var(--mmn-border) !important;
 }
 
 .mmn-theme-swatch {
@@ -581,7 +603,7 @@
   align-items: center;
   gap: 8px;
   padding: 7px 9px;
-  border: 1px solid rgba(17, 24, 39, 0.14);
+  border: 1px solid var(--mmn-border-strong);
   border-radius: 8px;
 }
 
@@ -590,6 +612,7 @@
   border: 0;
   outline: 0;
   background: transparent;
+  color: inherit;
 }
 
 .mmn-search-results {
@@ -606,12 +629,12 @@
   padding: 8px;
   border: 0;
   border-radius: 8px;
-  background: rgba(15, 23, 42, 0.04);
+  background: var(--mmn-surface-muted);
   text-align: left;
 }
 
 .mmn-search-results span {
-  color: #64748b;
+  color: var(--mmn-muted-text);
   font-size: 12px;
 }
 
@@ -635,9 +658,11 @@
 .mmn-inspector input {
   width: 100%;
   box-sizing: border-box;
-  border: 1px solid rgba(17, 24, 39, 0.14);
+  border: 1px solid var(--mmn-border-strong);
   border-radius: 8px;
   padding: 7px;
+  background: var(--mmn-surface);
+  color: inherit;
 }
 
 .mmn-inspector textarea {
@@ -655,7 +680,7 @@
   height: 100%;
   min-height: 300px;
   place-items: center;
-  color: #475569;
+  color: var(--mmn-muted-text);
 }
 
 .mmn-outline {
@@ -663,10 +688,10 @@
   gap: 6px;
   width: 100%;
   padding: 12px;
-  background: #ffffff;
-  border: 1px solid rgba(17, 24, 39, 0.12);
+  background: var(--mmn-surface);
+  border: 1px solid var(--mmn-border);
   border-radius: 8px;
-  color: #111827;
+  color: inherit;
   font-family:
     Inter,
     ui-sans-serif,
@@ -679,7 +704,7 @@
 
 .mmn-outline header {
   min-height: 32px;
-  border-bottom: 1px solid rgba(17, 24, 39, 0.08);
+  border-bottom: 1px solid var(--mmn-border);
 }
 
 .mmn-outline header button {
@@ -696,7 +721,7 @@
 }
 
 .mmn-outline-row--selected {
-  background: rgba(37, 99, 235, 0.1);
+  background: var(--mmn-control-hover);
 }
 
 .mmn-outline-row input {
@@ -708,13 +733,60 @@
 }
 
 .mmn-outline-row input:focus {
-  outline: 2px solid #2563eb;
+  outline: 2px solid var(--mmn-selected);
   outline-offset: 2px;
 }
 
 .mmn-outline-row__actions {
   display: inline-flex;
   gap: 2px;
+}
+
+/* React Flow MiniMap overrides */
+.mmn-editor .react-flow__minimap {
+  background-color: var(--mmn-canvas);
+  border: 1px solid var(--mmn-border);
+  border-radius: 8px;
+}
+
+.mmn-editor .react-flow__minimap-mask {
+  fill: rgba(15, 23, 42, 0.6);
+}
+
+.mmn-editor[data-theme-mode="dark"] .react-flow__minimap-mask {
+  fill: rgba(0, 0, 0, 0.6);
+}
+.mmn-editor .react-flow__minimap-node {
+  fill: var(--mmn-node);
+  stroke: var(--mmn-border);
+}
+
+/* React Flow Controls overrides */
+.mmn-editor .react-flow__controls {
+  box-shadow: var(--mmn-shadow);
+  border-radius: 6px;
+  overflow: hidden;
+  border: 1px solid var(--mmn-border);
+}
+
+.mmn-editor .react-flow__controls-button {
+  background: var(--mmn-surface);
+  border: 0;
+  border-bottom: 1px solid var(--mmn-border);
+  color: var(--mmn-node-text);
+  fill: currentColor;
+}
+
+.mmn-editor .react-flow__controls-button:last-child {
+  border-bottom: 0;
+}
+
+.mmn-editor .react-flow__controls-button:hover {
+  background: var(--mmn-control-hover);
+}
+
+.mmn-editor .react-flow__controls-button svg {
+  fill: currentColor;
 }
 
 @media (max-width: 760px) {

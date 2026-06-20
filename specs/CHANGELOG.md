@@ -1,5 +1,15 @@
 # Changelog
 
+## 2026-06-20 - Dark Mode & Live Playground Rendering
+
+完成 `10.dark-mode-live-playground-rendering/`，实现暗色模式视觉一致性与 playground 实时文本解析渲染：
+
+- `MindMapEditor` 绑定 `data-theme-mode` 并在 CSS 中支持语义 variables 以切换 Graphite 风格暗色模式。
+- 根节点与自动分支默认着色支持暗色 palette 自适应，同时优先遵循用户自定义节点 style。
+- 移除 playground 底部 `Apply` 按钮，改为 300ms 防抖文本自动解析并实时更新画布，同时通过同步 ref 初始化解决了 active drag-and-drop pointer session 在 mount 时断开的冲突。
+- 补齐 Graphite 样式 data-theme-mode 检查与 invalid JSON 容错保存 E2E 测试。
+- `tasks.md` 共 12 个任务均已标记为 `[x]`。
+
 ## 2026-06-19 - Node drag interaction polish
 
 完成 `7.node-drag-interaction-polish/`，补齐 playground 中节点拖拽整理工作流：

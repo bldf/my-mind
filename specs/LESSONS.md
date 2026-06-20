@@ -15,3 +15,8 @@
 - 本地 `pnpm` 首次运行会写用户级工具缓存，sandbox 下会失败；依赖安装与 Playwright 浏览器下载需要用户批准后执行。
 - Playwright E2E 不能复用常见 `5173` 端口，容易命中已有旧服务；测试专用端口固定为 `5187` 并启用 Vite `strictPort`。
 - VitePress build 会生成 `apps/docs/docs/.vitepress/.temp/`，需要在 `.gitignore` 和 ESLint ignore 中排除，不能把生成文件纳入 lint/review。
+
+## 2026-06-20 - Dark Mode Live Playground Rendering / 实时解析渲染与 mount 防抖避免冲突
+
+- **Mount 时的防抖自动导入冲突**: 首次加载页面时，若 `lastSyncedTextRef` 和 `lastImportedTextRef` 默认为空，组件渲染后 300ms 会自动触发一次导入解析，并调用 `setDocument` 重置文档。在 E2E 测试等场景下，如果在 mount 瞬间开始节点拖拽，这 300ms 的文档重置会导致 React Flow 的节点被销毁重建，从而切断拖拽中的 Pointer Session 并使测试失败。
+- **解决方法**: 在 `App.tsx` 中把 refs 的初始值设置为 initialDocument 序列化后的文本，使得 on mount 时的 `editorText === lastSyncedTextRef.current` 成立，完美规避初始多余的 debounced import 触发。

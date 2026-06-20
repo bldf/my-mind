@@ -1,5 +1,5 @@
 import { getVisibleNodeIds } from "@my-mind-node/core";
-import type { MindMapDocument, MindMapNode, NodeId } from "@my-mind-node/core";
+import type { MindMapDocument, MindMapNode, NodeId, MindMapTheme } from "@my-mind-node/core";
 import type { ReactNode } from "react";
 import type { Edge, Node } from "@xyflow/react";
 import type { DropIntent, MindNodeBranchSide } from "./drag-interactions";
@@ -34,6 +34,7 @@ export interface FlowConversionOptions {
   nodeMinScale?: number;
   nodeMaxScale?: number;
   renderNode?: (node: MindMapNode, selected: boolean) => ReactNode;
+  theme?: MindMapTheme;
 }
 
 export interface FlowConversionResult {
@@ -80,6 +81,39 @@ const AUTO_BRANCH_PALETTES: BranchPalette[] = [
   },
 ];
 
+const AUTO_BRANCH_PALETTES_DARK: BranchPalette[] = [
+  {
+    node: "#13383e",
+    border: "#2aa6b8",
+    edge: "#2aa6b8",
+    text: "#e0f7fa",
+  },
+  {
+    node: "#211d4d",
+    border: "#7c77d6",
+    edge: "#7c77d6",
+    text: "#ede9fe",
+  },
+  {
+    node: "#3b1d33",
+    border: "#c773af",
+    edge: "#c773af",
+    text: "#fdf2f8",
+  },
+  {
+    node: "#3d260f",
+    border: "#cca05a",
+    edge: "#cca05a",
+    text: "#fffbeb",
+  },
+  {
+    node: "#142d1b",
+    border: "#5ea36f",
+    edge: "#5ea36f",
+    text: "#f0fdf4",
+  },
+];
+
 function getMetadataString(node: MindMapNode, key: string): string | undefined {
   const value = node.metadata[key];
   return typeof value === "string" ? value : undefined;
@@ -88,10 +122,13 @@ function getMetadataString(node: MindMapNode, key: string): string | undefined {
 function getBranchPaletteByNodeId(
   document: MindMapDocument,
   viewRootId: NodeId,
+  theme?: MindMapTheme,
 ): Map<NodeId, BranchPalette> {
   const result = new Map<NodeId, BranchPalette>();
   const viewRoot = document.nodes[viewRootId];
   if (!viewRoot) return result;
+
+  const palettes = theme?.mode === "dark" ? AUTO_BRANCH_PALETTES_DARK : AUTO_BRANCH_PALETTES;
 
   const paint = (nodeId: NodeId, palette: BranchPalette) => {
     const node = document.nodes[nodeId];
@@ -102,7 +139,7 @@ function getBranchPaletteByNodeId(
   };
 
   viewRoot.children.forEach((childId, index) =>
-    paint(childId, AUTO_BRANCH_PALETTES[index % AUTO_BRANCH_PALETTES.length]!),
+    paint(childId, palettes[index % palettes.length]!),
   );
   return result;
 }
@@ -111,15 +148,21 @@ function applyDefaultPresentation(
   node: MindMapNode,
   palette: BranchPalette | undefined,
   isViewRoot: boolean,
+  theme?: MindMapTheme,
 ): MindMapNode {
+  const isDark = theme?.mode === "dark";
+  const defaultRootBg = isDark && theme ? theme.colors.node : ROOT_PRESENTATION.backgroundColor;
+  const defaultRootBorder = isDark && theme ? theme.colors.node : ROOT_PRESENTATION.borderColor;
+  const defaultRootColor = isDark && theme ? theme.colors.nodeText : ROOT_PRESENTATION.color;
+
   const style = {
     ...node.style,
     backgroundColor:
       node.style.backgroundColor ??
-      (isViewRoot ? ROOT_PRESENTATION.backgroundColor : palette?.node),
+      (isViewRoot ? defaultRootBg : palette?.node),
     borderColor:
-      node.style.borderColor ?? (isViewRoot ? ROOT_PRESENTATION.borderColor : palette?.border),
-    color: node.style.color ?? (isViewRoot ? ROOT_PRESENTATION.color : palette?.text),
+      node.style.borderColor ?? (isViewRoot ? defaultRootBorder : palette?.border),
+    color: node.style.color ?? (isViewRoot ? defaultRootColor : palette?.text),
     fontWeight: node.style.fontWeight ?? (isViewRoot ? "bold" : palette ? "medium" : undefined),
   };
 
@@ -216,7 +259,7 @@ export function documentToFlow(
   const highlighted = new Set(options.highlightedNodeIds ?? []);
   const visibleIds = getVisibleNodeIds(document, viewRootId);
   const visibleSet = new Set(visibleIds);
-  const branchPaletteByNodeId = getBranchPaletteByNodeId(document, viewRootId);
+  const branchPaletteByNodeId = getBranchPaletteByNodeId(document, viewRootId, options.theme);
   const presentationNodes = new Map(
     visibleIds.flatMap((nodeId) => {
       const node = document.nodes[nodeId];
@@ -224,7 +267,12 @@ export function documentToFlow(
       return [
         [
           nodeId,
-          applyDefaultPresentation(node, branchPaletteByNodeId.get(nodeId), nodeId === viewRootId),
+          applyDefaultPresentation(
+            node,
+            branchPaletteByNodeId.get(nodeId),
+            nodeId === viewRootId,
+            options.theme,
+          ),
         ],
       ];
     }),

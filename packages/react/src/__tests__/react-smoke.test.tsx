@@ -420,4 +420,57 @@ describe("@my-mind-node/react", () => {
     expect(onResizeProgress).not.toHaveBeenCalled();
     expect(onResizeCommit).toHaveBeenCalledWith(asNodeId("first"), 1.15);
   });
+
+  it("assigns automatic branch colors and root styles under dark theme", () => {
+    const document = createEmptyDocument({ rootTitle: "Root" });
+    const root = document.nodes[document.rootId]!;
+    const firstId = asNodeId("first");
+    const secondId = asNodeId("second");
+    const customId = asNodeId("custom");
+    root.children = [firstId, secondId, customId];
+    document.nodes[firstId] = createNode({
+      id: firstId,
+      parentId: document.rootId,
+      title: "First",
+    });
+    document.nodes[secondId] = createNode({
+      id: secondId,
+      parentId: document.rootId,
+      title: "Second",
+    });
+    document.nodes[customId] = createNode({
+      id: customId,
+      parentId: document.rootId,
+      title: "Custom",
+      style: { backgroundColor: "#123456", borderColor: "#654321", color: "#f8fafc" },
+    });
+
+    const darkTheme = {
+      id: "graphite",
+      name: "Graphite",
+      mode: "dark" as const,
+      colors: {
+        canvas: "#111315",
+        node: "#1f242a",
+        nodeText: "#f8fafc",
+        edge: "#8b98a9",
+        selected: "#38bdf8",
+        accent: "#f59e0b",
+      },
+    };
+
+    const flow = documentToFlow(document, { theme: darkTheme });
+    const getFlowNode = (id: string) =>
+      flow.nodes.find((node) => node.id === id)!.data.node as MindMapNode;
+
+    const rootNode = getFlowNode(String(document.rootId));
+    expect(rootNode.style.backgroundColor).toBe("#1f242a");
+    expect(rootNode.style.color).toBe("#f8fafc");
+
+    expect(getFlowNode("first").style.backgroundColor).toBe("#13383e");
+    expect(getFlowNode("second").style.backgroundColor).toBe("#211d4d");
+    expect(getFlowNode("custom").style.backgroundColor).toBe("#123456");
+    expect(getFlowNode("custom").style.borderColor).toBe("#654321");
+    expect(getFlowNode("custom").style.color).toBe("#f8fafc");
+  });
 });

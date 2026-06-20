@@ -88,7 +88,6 @@ test("playground renders editor, JSON pane and toolbar", async ({ page }) => {
 test("json parse errors are visible", async ({ page }) => {
   await page.goto("/");
   await page.getByLabel("Mind map JSON").fill("{");
-  await page.getByRole("button", { name: "Apply" }).click();
   await expect(page.getByText(/INVALID_JSON/)).toBeVisible();
 });
 
@@ -96,7 +95,6 @@ test("markdown data mode applies markdown instead of parsing it as json", async 
   await page.goto("/");
   await page.getByRole("button", { name: "Markdown" }).click();
   await page.getByLabel("Mind map Markdown").fill("# Edited map\n- Alpha\n  - Beta");
-  await page.getByRole("button", { name: "Apply" }).click();
 
   await expect(page.getByText(/INVALID_JSON/)).toHaveCount(0);
   await expect(page.getByLabel("Title for Edited map")).toBeVisible();
@@ -119,7 +117,6 @@ test("mermaid data mode applies mindmap syntax", async ({ page }) => {
   await page
     .getByLabel("Mind map Mermaid")
     .fill("mindmap\n  root((Edited map))\n    Professional terminal\n      Ghostty");
-  await page.getByRole("button", { name: "Apply" }).click();
 
   await expect(page.getByText(/UNSUPPORTED_MERMAID|EMPTY_MERMAID/)).toHaveCount(0);
   await expect(page.getByLabel("Title for Edited map")).toBeVisible();
@@ -146,7 +143,6 @@ test("json data mode falls back to markdown when markdown is pasted", async ({ p
       - Topic 88
         - [Example](https://example.com)
 - Topic 2`);
-  await page.getByRole("button", { name: "Apply" }).click();
 
   await expect(page.getByText(/INVALID_JSON/)).toHaveCount(0);
   await expect(page.getByLabel("Mind map Markdown")).toBeVisible();
@@ -181,6 +177,63 @@ test("json data mode falls back to markdown when markdown is pasted", async ({ p
       topSide: "left",
       top: "Topssssic 1",
     });
+});
+
+test("invalid input does not cover valid document and error disappears on fix", async ({ page }) => {
+  await page.goto("/");
+  await expect(page.getByLabel("Title for 100 node map")).toBeVisible();
+
+  // Fill invalid JSON
+  await page.getByLabel("Mind map JSON").fill("{");
+  await expect(page.getByText(/INVALID_JSON/)).toBeVisible();
+
+  // Canvas should NOT be covered (the old node is still visible)
+  await expect(page.getByLabel("Title for 100 node map")).toBeVisible();
+
+  // Fix the JSON
+  await page.getByLabel("Mind map JSON").fill(`{
+    "schemaVersion": "1.0",
+    "id": "test-doc",
+    "title": "Fixed Map",
+    "rootId": "node-0",
+    "nodes": {
+      "node-0": {
+        "id": "node-0",
+        "parentId": null,
+        "children": [],
+        "title": "Fixed Map",
+        "links": [],
+        "tagIds": [],
+        "collapsed": false,
+        "position": { "x": 0, "y": 0 },
+        "style": {},
+        "metadata": {}
+      }
+    },
+    "connections": [],
+    "tags": [],
+    "layout": { "direction": "right", "gapX": 180, "gapY": 88 },
+    "revision": 1,
+    "metadata": {}
+  }`);
+
+  // Error should disappear and map should update
+  await expect(page.getByText(/INVALID_JSON/)).toHaveCount(0);
+  await expect(page.getByLabel("Title for Fixed Map")).toBeVisible();
+});
+
+test("Graphite theme dark mode visual style data-theme-mode is set", async ({ page }) => {
+  await page.goto("/");
+
+  // Open themes panel
+  await page.getByRole("button", { name: "Themes" }).click();
+
+  // Select Graphite
+  await page.getByRole("button", { name: "Graphite" }).click();
+
+  // Check that the data-theme-mode attribute is set on .mmn-editor
+  const editor = page.locator(".mmn-editor");
+  await expect(editor).toHaveAttribute("data-theme-mode", "dark");
 });
 
 test("dragging a node follows the pointer and then returns to the stable layout", async ({
