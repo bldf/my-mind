@@ -6,11 +6,11 @@ import {
 } from "@my-mind-node/core";
 
 export type DropIntent =
-  | { type: "none" }
-  | { type: "reparent"; targetId: NodeId; armed?: boolean }
-  | { type: "sort-before"; targetId: NodeId }
-  | { type: "sort-after"; targetId: NodeId }
-  | { type: "invalid"; targetId?: NodeId; reason: string };
+  | { type: "none"; noOp?: boolean }
+  | { type: "reparent"; targetId: NodeId; armed?: boolean; noOp?: boolean }
+  | { type: "sort-before"; targetId: NodeId; noOp?: boolean }
+  | { type: "sort-after"; targetId: NodeId; noOp?: boolean }
+  | { type: "invalid"; targetId?: NodeId; reason: string; noOp?: boolean };
 
 export type DropMode = "reparent" | "sort";
 export type DropZone = "before" | "center" | "after";
@@ -228,7 +228,61 @@ export function getSortInsertionIndex(
   return placement === "before" ? targetIndex : targetIndex + 1;
 }
 
+export function isMoveNoOp(
+  document: MindMapDocument,
+  movingNodeIds: NodeId[],
+  parentId: NodeId,
+  index?: number,
+): boolean {
+  const topLevel = getTopLevelMovableNodeIds(document, movingNodeIds);
+  if (topLevel.length === 0) return true;
+
+  const parentChildren: Record<NodeId, NodeId[]> = {};
+  const getChildren = (pId: NodeId) => {
+    if (!parentChildren[pId]) {
+      parentChildren[pId] = [...(document.nodes[pId]?.children ?? [])];
+    }
+    return parentChildren[pId];
+  };
+
+  // Simulate removals
+  for (const nodeId of topLevel) {
+    const currentParentId = document.nodes[nodeId]?.parentId;
+    if (!currentParentId) return false;
+    const children = getChildren(currentParentId);
+    parentChildren[currentParentId] = children.filter((id) => id !== nodeId);
+  }
+
+  // Simulate insertions
+  let insertIndex = index;
+  for (const nodeId of topLevel) {
+    const children = getChildren(parentId);
+    const safeIndex =
+      insertIndex === undefined
+        ? children.length
+        : Math.max(0, Math.min(insertIndex, children.length));
+    children.splice(safeIndex, 0, nodeId);
+    parentChildren[parentId] = children;
+    if (insertIndex !== undefined) {
+      insertIndex++;
+    }
+  }
+
+  // Compare children of all affected parents
+  for (const pId of Object.keys(parentChildren)) {
+    const original = document.nodes[pId as NodeId]?.children ?? [];
+    const modified = parentChildren[pId as NodeId];
+    if (!modified || original.length !== modified.length) return false;
+    for (let i = 0; i < original.length; i++) {
+      if (original[i] !== modified[i]) return false;
+    }
+  }
+
+  return true;
+}
+
 export function getDropIntentLabel(intent: DropIntent): string | undefined {
+  if (intent.noOp) return undefined;
   if (intent.type === "reparent") return "Drop to add as child";
   if (intent.type === "sort-before") return "Insert before this node";
   if (intent.type === "sort-after") return "Insert after this node";

@@ -44,6 +44,7 @@ import {
   getDropValidationReason,
   getSortInsertionIndex,
   getTopLevelMovableNodeIds,
+  isMoveNoOp,
   type DropRect,
   type DropIntent,
 } from "./drag-interactions";
@@ -451,13 +452,16 @@ function EditorCanvas(props: MindMapEditorProps) {
 
   const resizeNodes = useCallback(
     (nodeIds: NodeId[], delta: number) => {
-      runCommand({
-        type: "node.resize",
-        nodeIds,
-        delta,
-        minScale: props.nodeSizing?.minScale,
-        maxScale: props.nodeSizing?.maxScale,
-      });
+      runCommand(
+        {
+          type: "node.resize",
+          nodeIds,
+          delta,
+          minScale: props.nodeSizing?.minScale,
+          maxScale: props.nodeSizing?.maxScale,
+        },
+        { autoLayout: true },
+      );
     },
     [props.nodeSizing?.maxScale, props.nodeSizing?.minScale, runCommand],
   );
@@ -628,9 +632,18 @@ function EditorCanvas(props: MindMapEditorProps) {
       const mode = hitTarget.geometry.type === "reparent" ? "reparent" : "sort";
       const reason = getDropValidationReason(document, movingNodeIds, hitTarget.id, mode);
       if (reason) return { type: "invalid", targetId: hitTarget.id, reason };
-      if (hitTarget.geometry.type === "reparent")
-        return { type: "reparent", targetId: hitTarget.id };
-      return { type: hitTarget.geometry.type, targetId: hitTarget.id };
+      if (hitTarget.geometry.type === "reparent") {
+        const noOp = isMoveNoOp(document, movingNodeIds, hitTarget.id);
+        return { type: "reparent", targetId: hitTarget.id, noOp };
+      }
+      const placement = hitTarget.geometry.type === "sort-before" ? "before" : "after";
+      const index = getSortInsertionIndex(document, hitTarget.id, movingNodeIds, placement);
+      const parentId = document.nodes[hitTarget.id]?.parentId;
+      const noOp =
+        parentId && index !== undefined
+          ? isMoveNoOp(document, movingNodeIds, parentId, index)
+          : false;
+      return { type: hitTarget.geometry.type, targetId: hitTarget.id, noOp };
     },
     [document, dragSettings.sortZoneRatio, flowNodes],
   );

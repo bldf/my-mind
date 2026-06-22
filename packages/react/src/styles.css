@@ -125,7 +125,7 @@
   min-height: 38px;
   align-items: center;
   padding: 8px 14px;
-  transform-origin: center;
+  transform-origin: 0 0;
   background: var(--mmn-node);
   border: 1px solid var(--mmn-border);
   border-radius: 8px;
@@ -191,7 +191,7 @@
   letter-spacing: 0;
   line-height: 1.35;
   overflow-wrap: anywhere;
-  text-align: left;
+  text-align: center;
   white-space: pre-wrap;
 }
 
@@ -202,7 +202,7 @@
 }
 
 .mmn-node__title--readonly {
-  justify-content: flex-start;
+  justify-content: center;
   padding: 0;
 }
 
@@ -221,6 +221,48 @@
 .mmn-node__title:focus {
   outline: 2px solid var(--mmn-selected);
   outline-offset: 3px;
+}
+
+.mmn-node__link-btn {
+  position: absolute;
+  top: -8px;
+  right: -8px;
+  z-index: 4;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 18px;
+  height: 18px;
+  min-width: 18px;
+  min-height: 18px;
+  padding: 0;
+  background: var(--mmn-surface);
+  border: 1px solid var(--mmn-border);
+  border-radius: 999px;
+  box-shadow: var(--mmn-shadow);
+  color: var(--mmn-selected);
+  cursor: pointer;
+  opacity: 0;
+  pointer-events: none;
+  transition:
+    opacity 140ms ease,
+    background 140ms ease;
+}
+
+.mmn-node__link-btn:hover {
+  background: var(--mmn-control-hover);
+}
+
+.mmn-node__link-btn:focus-visible {
+  outline: 2px solid var(--mmn-selected);
+  outline-offset: 2px;
+}
+
+.mmn-node:hover .mmn-node__link-btn,
+.mmn-node:focus-within .mmn-node__link-btn,
+.mmn-node__link-btn:focus-visible {
+  opacity: 1;
+  pointer-events: auto;
 }
 
 .mmn-node__status {
@@ -353,6 +395,38 @@
 .mmn-node:hover .mmn-node__control--collapse,
 .mmn-node:focus-within .mmn-node__control--collapse {
   transform: translateY(-50%) scale(1);
+}
+
+.mmn-node__control--reset {
+  bottom: -30px;
+  left: 50%;
+  transform: translateX(-50%) scale(0.94);
+}
+
+.mmn-node:hover .mmn-node__control--reset,
+.mmn-node:focus-within .mmn-node__control--reset {
+  transform: translateX(-50%) scale(1);
+}
+
+.mmn-node--branch-down:has(.mmn-node__control--reset) .mmn-node__control--reset {
+  left: 50%;
+  transform: translateX(-31px) scale(0.94);
+}
+
+.mmn-node--branch-down:has(.mmn-node__control--reset):hover .mmn-node__control--reset,
+.mmn-node--branch-down:has(.mmn-node__control--reset):focus-within .mmn-node__control--reset {
+  transform: translateX(-31px) scale(1);
+}
+
+.mmn-node--branch-down:has(.mmn-node__control--reset) .mmn-node__control--add {
+  right: 50%;
+  left: auto;
+  transform: translateX(31px) scale(0.94);
+}
+
+.mmn-node--branch-down:has(.mmn-node__control--reset):hover .mmn-node__control--add,
+.mmn-node--branch-down:has(.mmn-node__control--reset):focus-within .mmn-node__control--add {
+  transform: translateX(31px) scale(1);
 }
 
 .mmn-node--branch-left .mmn-node__control--add {

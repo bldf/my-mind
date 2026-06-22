@@ -78,11 +78,23 @@ async function expectNodeInsideCanvas(page: import("@playwright/test").Page, nod
     .toBe(true);
 }
 
+async function expectNodeTitleNotClipped(page: import("@playwright/test").Page, nodeId: string) {
+  await expect
+    .poll(async () =>
+      page.locator(`.react-flow__node[data-id="${nodeId}"] textarea`).evaluate((textarea) => ({
+        horizontal: textarea.scrollWidth <= textarea.clientWidth + 1,
+        vertical: textarea.scrollHeight <= textarea.clientHeight + 1,
+      })),
+    )
+    .toEqual({ horizontal: true, vertical: true });
+}
+
 test("playground renders editor, JSON pane and toolbar", async ({ page }) => {
   await page.goto("/");
   await expect(page.getByLabel("Mind map playground")).toBeVisible();
   await expect(page.getByLabel("Mind map tools")).toBeVisible();
   await expect(page.getByRole("button", { name: "Themes" })).toBeVisible();
+  await expectNodeTitleNotClipped(page, "node-0");
 });
 
 test("json parse errors are visible", async ({ page }) => {

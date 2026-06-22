@@ -14,6 +14,7 @@ import {
   getDropValidationReason,
   getSortInsertionIndex,
   getTopLevelMovableNodeIds,
+  isMoveNoOp,
 } from "../drag-interactions";
 import { documentToFlow } from "../document-to-flow";
 import { MindMapEditor } from "../MindMapEditor";
@@ -265,6 +266,46 @@ describe("@my-mind-node/react", () => {
     expect(onOpenLink).not.toHaveBeenCalled();
   });
 
+  it("opens link data from the editable title textarea when clicked with meta/ctrl key", () => {
+    const node = createNode({
+      id: asNodeId("first"),
+      title: "First",
+      links: [{ url: "https://example.com" }],
+    });
+    const onOpenLink = vi.fn();
+
+    renderMindNode({
+      node,
+      link: { url: "https://example.com" },
+      onOpenLink,
+    });
+
+    const textarea = screen.getByLabelText("Title for First");
+    fireEvent.click(textarea, { metaKey: true });
+
+    expect(onOpenLink).toHaveBeenCalledWith("https://example.com", node);
+  });
+
+  it("opens link data from the floating link button in editor mode", () => {
+    const node = createNode({
+      id: asNodeId("first"),
+      title: "First",
+      links: [{ url: "https://example.com" }],
+    });
+    const onOpenLink = vi.fn();
+
+    renderMindNode({
+      node,
+      link: { url: "https://example.com" },
+      onOpenLink,
+    });
+
+    const linkBtn = screen.getByRole("button", { name: "Open link https://example.com from First" });
+    fireEvent.click(linkBtn);
+
+    expect(onOpenLink).toHaveBeenCalledWith("https://example.com", node);
+  });
+
   it("derives link data in flow nodes without wrapping custom renderers", () => {
     const document = createEmptyDocument({ rootTitle: "https://root.example" });
     const childId = asNodeId("child");
@@ -366,6 +407,32 @@ describe("@my-mind-node/react", () => {
     });
     expect(onResizeNode).toHaveBeenNthCalledWith(1, [asNodeId("first")], -0.2);
     expect(onResizeNode).toHaveBeenNthCalledWith(2, [asNodeId("first")], 0.2);
+  });
+
+  it("shows reset scale control only for selected nodes with quick controls enabled", () => {
+    const node = createNode({
+      id: asNodeId("first"),
+      title: "First",
+      style: { scale: 1.4 },
+    });
+    const onResizeCommit = vi.fn();
+
+    renderMindNode({ node, onResizeCommit }, false);
+    expect(
+      screen.queryByRole("button", { name: "Reset scale of First to default" }),
+    ).toBeNull();
+
+    cleanup();
+    renderMindNode({ node, onResizeCommit, showNodeResizeControls: false }, true);
+    expect(
+      screen.queryByRole("button", { name: "Reset scale of First to default" }),
+    ).toBeNull();
+
+    cleanup();
+    renderMindNode({ node, onResizeCommit }, true);
+    fireEvent.click(screen.getByRole("button", { name: "Reset scale of First to default" }));
+
+    expect(onResizeCommit).toHaveBeenCalledWith(asNodeId("first"), 1);
   });
 
   it("assigns automatic branch colors without overriding custom node colors", () => {
@@ -581,5 +648,28 @@ describe("@my-mind-node/react", () => {
     expect(getFlowNode("custom").style.backgroundColor).toBe("#123456");
     expect(getFlowNode("custom").style.borderColor).toBe("#654321");
     expect(getFlowNode("custom").style.color).toBe("#f8fafc");
+  });
+
+  it("correctly identifies no-op moves and suppresses getDropIntentLabel", () => {
+    const document = createDocumentWithRootChildren();
+    // document.rootId has children: ["first", "second"]
+
+    // Moving "first" before "second" is a no-op (result would still be ["first", "second"])
+    expect(isMoveNoOp(document, [asNodeId("first")], document.rootId, 0)).toBe(true);
+
+    // Moving "second" before "first" is NOT a no-op (result would be ["second", "first"])
+    expect(isMoveNoOp(document, [asNodeId("second")], document.rootId, 0)).toBe(false);
+
+    // Reparenting "second" under its current parent at the end of children list is a no-op
+    // because it's already the last child.
+    expect(isMoveNoOp(document, [asNodeId("second")], document.rootId, undefined)).toBe(true);
+
+    // Reparenting "first" under its current parent at the end of children list is NOT a no-op
+    // because it moves "first" from index 0 to index 1.
+    expect(isMoveNoOp(document, [asNodeId("first")], document.rootId, undefined)).toBe(false);
+
+    // Check that drop label is undefined when noOp is true
+    expect(getDropIntentLabel({ type: "sort-before", targetId: asNodeId("second"), noOp: true })).toBeUndefined();
+    expect(getDropIntentLabel({ type: "reparent", targetId: asNodeId("root"), noOp: true })).toBeUndefined();
   });
 });

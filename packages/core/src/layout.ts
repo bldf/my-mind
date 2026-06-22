@@ -6,7 +6,9 @@ export const MAX_NODE_WIDTH = 360;
 export const NODE_HORIZONTAL_PADDING = 32;
 const NODE_BASE_HEIGHT = 46;
 const NODE_LINE_HEIGHT = 18;
-const CHARACTER_WIDTH = 7.4;
+const CHARACTER_WIDTH = 8;
+const WIDE_LATIN_CHARACTER_WIDTH = 10.2;
+const NODE_WIDTH_SAFETY = 8;
 
 interface LayoutBox {
   id: NodeId;
@@ -36,6 +38,8 @@ function getTitleCharacterWidth(character: string): number {
     return 14;
   }
   if (/\s/.test(character)) return 4;
+  if (character === "/" || /[iljtfrI.,:;!\\|\-_()[\]{}]/.test(character)) return 4.5;
+  if (/[mw]/i.test(character)) return WIDE_LATIN_CHARACTER_WIDTH;
   if (/[A-Z0-9]/.test(character)) return 8.2;
   return CHARACTER_WIDTH;
 }
@@ -50,7 +54,12 @@ export function getNodeWidthOverride(node: Pick<MindMapNode, "metadata">): numbe
 }
 
 export function estimateLayoutNodeWidth(node: Pick<MindMapNode, "metadata" | "title">): number {
-  return clamp(getNodeWidthOverride(node) ?? estimateLayoutTitleWidth(node.title) + NODE_HORIZONTAL_PADDING, MIN_NODE_WIDTH, MAX_NODE_WIDTH);
+  return clamp(
+    getNodeWidthOverride(node) ??
+      estimateLayoutTitleWidth(node.title) + NODE_HORIZONTAL_PADDING + NODE_WIDTH_SAFETY,
+    MIN_NODE_WIDTH,
+    MAX_NODE_WIDTH,
+  );
 }
 
 export function estimateLayoutNodeHeight(node: Pick<MindMapNode, "metadata" | "style" | "task" | "title">): number {

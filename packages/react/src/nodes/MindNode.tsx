@@ -8,7 +8,7 @@ import {
   type NodeId,
   type NodeLink,
 } from "@my-mind-node/core";
-import { ChevronLeft, ChevronRight, Plus } from "lucide-react";
+import { ChevronLeft, ChevronRight, ExternalLink, Plus, RotateCcw } from "lucide-react";
 import { memo, useCallback, useEffect, useRef, useState } from "react";
 import type {
   KeyboardEvent as ReactKeyboardEvent,
@@ -115,6 +115,12 @@ export const MindNode = memo(function MindNode(props: NodeProps) {
     !data.readonly &&
     data.showNodeResizeControls !== false &&
     (Boolean(data.onResizeNode) || Boolean(data.onResizeCommit));
+  const canShowReset =
+    props.selected &&
+    !data.readonly &&
+    data.showNodeResizeControls !== false &&
+    Math.abs(scale - 1) > 0.01 &&
+    Boolean(data.onResizeCommit);
   const linkLabel = link?.label ?? link?.url;
   const collapseLabel = node.collapsed ? "Expand node" : "Collapse node";
   const resizeStep = data.nodeResizeStep ?? 0.1;
@@ -230,10 +236,10 @@ export const MindNode = memo(function MindNode(props: NodeProps) {
         data.highlighted ? "mmn-node--highlighted" : "",
         data.flash ? "mmn-node--drop-flash" : "",
         data.branchSide ? `mmn-node--branch-${data.branchSide}` : "",
-        data.dropIntent?.type === "reparent" ? "mmn-node--drop-reparent" : "",
-        data.dropIntent?.type === "reparent" && data.dropIntent.armed ? "mmn-node--drop-armed" : "",
-        data.dropIntent?.type === "sort-before" ? "mmn-node--sort-before" : "",
-        data.dropIntent?.type === "sort-after" ? "mmn-node--sort-after" : "",
+        data.dropIntent?.type === "reparent" && !data.dropIntent.noOp ? "mmn-node--drop-reparent" : "",
+        data.dropIntent?.type === "reparent" && data.dropIntent.armed && !data.dropIntent.noOp ? "mmn-node--drop-armed" : "",
+        data.dropIntent?.type === "sort-before" && !data.dropIntent.noOp ? "mmn-node--sort-before" : "",
+        data.dropIntent?.type === "sort-after" && !data.dropIntent.noOp ? "mmn-node--sort-after" : "",
         data.dropIntent?.type === "invalid" ? "mmn-node--drop-invalid" : "",
         link ? "mmn-node--link" : "",
       ]
@@ -294,20 +300,54 @@ export const MindNode = memo(function MindNode(props: NodeProps) {
           {node.title}
         </button>
       ) : (
-        <textarea
-          className="mmn-node__title mmn-node__title--editable"
-          value={draft}
-          rows={getTextareaRows(draft, nodeWidth)}
-          aria-label={`Title for ${node.title}`}
-          onChange={(event) => setDraft(event.target.value)}
-          onBlur={() => data.onTitleCommit?.(node.id, getCommittedTitle(draft))}
-          onKeyDown={(event) => {
-            if (event.key === "Enter" && !event.shiftKey) {
-              event.preventDefault();
-              event.currentTarget.blur();
-            }
-          }}
-        />
+        <>
+          <textarea
+            className={[
+              "mmn-node__title",
+              "mmn-node__title--editable",
+              link ? "mmn-node__title--link" : "",
+            ]
+              .filter(Boolean)
+              .join(" ")}
+            value={draft}
+            rows={getTextareaRows(draft, nodeWidth)}
+            aria-label={`Title for ${node.title}`}
+            onChange={(event) => setDraft(event.target.value)}
+            onBlur={() => data.onTitleCommit?.(node.id, getCommittedTitle(draft))}
+            onKeyDown={(event) => {
+              if (event.key === "Enter" && !event.shiftKey) {
+                event.preventDefault();
+                event.currentTarget.blur();
+              }
+            }}
+            onClick={(event) => {
+              if ((event.metaKey || event.ctrlKey) && link) {
+                event.preventDefault();
+                event.stopPropagation();
+                data.onOpenLink?.(link.url, node);
+              }
+            }}
+          />
+          {link && (
+            <button
+              className="mmn-node__link-btn nodrag nopan"
+              type="button"
+              title={`Open link: ${link.url}`}
+              aria-label={`Open link ${linkLabel} from ${node.title}`}
+              onPointerDown={(event) => event.stopPropagation()}
+              onMouseDown={(event) => event.stopPropagation()}
+              onClick={(event) => {
+                event.preventDefault();
+                event.stopPropagation();
+                if (link) {
+                  data.onOpenLink?.(link.url, node);
+                }
+              }}
+            >
+              <ExternalLink size={12} />
+            </button>
+          )}
+        </>
       )}
       {node.task ? <span className="mmn-node__status">{node.task.status}</span> : null}
       {dropLabel ? (
@@ -315,7 +355,7 @@ export const MindNode = memo(function MindNode(props: NodeProps) {
           {dropLabel}
         </span>
       ) : null}
-      {data.dropIntent?.type === "sort-before" ? (
+      {data.dropIntent?.type === "sort-before" && !data.dropIntent.noOp ? (
         <span
           className="mmn-node__insert-line mmn-node__insert-line--before"
           role="status"
@@ -324,7 +364,7 @@ export const MindNode = memo(function MindNode(props: NodeProps) {
           Before
         </span>
       ) : null}
-      {data.dropIntent?.type === "sort-after" ? (
+      {data.dropIntent?.type === "sort-after" && !data.dropIntent.noOp ? (
         <span
           className="mmn-node__insert-line mmn-node__insert-line--after"
           role="status"
@@ -363,6 +403,22 @@ export const MindNode = memo(function MindNode(props: NodeProps) {
           }}
         >
           {node.collapsed ? <ChevronRight size={15} /> : <ChevronLeft size={15} />}
+        </button>
+      ) : null}
+      {canShowReset ? (
+        <button
+          className="mmn-node__control mmn-node__control--reset nodrag nopan"
+          type="button"
+          title="Reset scale to 100%"
+          aria-label={`Reset scale of ${node.title} to default`}
+          onPointerDown={(event) => event.stopPropagation()}
+          onMouseDown={(event) => event.stopPropagation()}
+          onClick={(event) => {
+            event.stopPropagation();
+            data.onResizeCommit?.(node.id, 1);
+          }}
+        >
+          <RotateCcw size={14} />
         </button>
       ) : null}
       {hasCollapsedHiddenCount ? (

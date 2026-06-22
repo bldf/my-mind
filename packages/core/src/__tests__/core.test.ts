@@ -108,4 +108,16 @@ describe("@my-mind-node/core", () => {
     expect(estimateLayoutTitleWidth("Alpha\nBeta")).toBe(estimateLayoutTitleWidth("Alpha"));
     expect(estimateLayoutNodeHeight(multiLine)).toBeGreaterThan(estimateLayoutNodeHeight(singleLine));
   });
+
+  it("correctly estimates layout width and height for long URLs", () => {
+    const url = "https://weixin.qq.com/https://weixin.qq.com/";
+    const document = createEmptyDocument({ rootTitle: url });
+    const node = document.nodes[document.rootId]!;
+
+    const estimatedWidth = estimateLayoutTitleWidth(url);
+    expect(estimatedWidth).toBeLessThan(300);
+
+    const height = estimateLayoutNodeHeight(node);
+    expect(height).toBe(46);
+  });
 });
