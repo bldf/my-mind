@@ -7,7 +7,8 @@
   "packageManager": "pnpm@9.15.0",
   "scripts": {
     "build": "pnpm --recursive --filter './packages/*' build && pnpm --filter @my-mind-node/playground build && pnpm --filter @my-mind-node/docs build",
-    "test": "pnpm --recursive --filter './packages/*' test && pnpm bench",
+    "test": "pnpm test:package-metadata && pnpm --recursive --filter './packages/*' test && pnpm bench",
+    "test:package-metadata": "node --test tests/package-metadata.test.mjs",
     "typecheck": "pnpm --recursive --filter './packages/*' typecheck && pnpm --filter @my-mind-node/playground typecheck",
     "lint": "eslint . --max-warnings=0",
     "format": "prettier --check .",
