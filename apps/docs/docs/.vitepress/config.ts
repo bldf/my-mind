@@ -26,6 +26,7 @@ export default defineConfig({
         items: [
           { text: "API", link: "/reference/api" },
           { text: "Migration", link: "/reference/migration" },
+          { text: "npm Publishing", link: "/reference/npm-publishing" },
           { text: "Public Beta Report", link: "/reference/public-beta-report" },
         ],
       },
