@@ -86,6 +86,21 @@ async function getViewportState(page: import("@playwright/test").Page) {
   });
 }
 
+async function dispatchPinchLikeWheel(
+  page: import("@playwright/test").Page,
+  point: { x: number; y: number },
+  deltaY: number,
+) {
+  await page.locator(".react-flow").dispatchEvent("wheel", {
+    bubbles: true,
+    cancelable: true,
+    clientX: point.x,
+    clientY: point.y,
+    ctrlKey: true,
+    deltaY,
+  });
+}
+
 async function expectNodeInsideCanvas(page: import("@playwright/test").Page, nodeId: string) {
   await expect
     .poll(async () => {
@@ -201,7 +216,63 @@ test("hidden search configuration removes the toolbar entry", async ({ page }) =
   await expect(page.getByRole("button", { name: "Search" })).toHaveCount(0);
 });
 
-test("small wheel deltas zoom smoothly around the pointer", async ({ page, isMobile }) => {
+test("ordinary wheel input pans the viewport without changing zoom", async ({
+  page,
+  isMobile,
+}) => {
+  test.skip(isMobile, "Desktop wheel input is covered separately from mobile touch basics.");
+
+  await page.goto("/");
+  await waitForViewportSettled(page);
+  const canvas = await page.locator(".react-flow").boundingBox();
+  if (!canvas) throw new Error("React Flow canvas is not visible");
+  const beforeViewport = await getViewportState(page);
+
+  await page.mouse.move(canvas.x + canvas.width - 48, canvas.y + canvas.height - 48);
+  await page.mouse.wheel(36, 72);
+
+  await expect
+    .poll(async () => {
+      const viewport = await getViewportState(page);
+      return Math.abs(viewport.x - beforeViewport.x) + Math.abs(viewport.y - beforeViewport.y);
+    })
+    .toBeGreaterThan(20);
+  const afterViewport = await getViewportState(page);
+  expect(afterViewport.zoom).toBeCloseTo(beforeViewport.zoom, 5);
+  expect(afterViewport.x).toBeLessThan(beforeViewport.x);
+  expect(afterViewport.y).toBeLessThan(beforeViewport.y);
+});
+
+test("ordinary wheel input over an editable node title still pans the viewport", async ({
+  page,
+  isMobile,
+}) => {
+  test.skip(isMobile, "Desktop wheel input is covered separately from mobile touch basics.");
+
+  await page.goto("/");
+  await waitForViewportSettled(page);
+  const node = await getNodeBox(page, "node-1");
+  const title = node.locator.locator("textarea");
+  const titleBox = await title.boundingBox();
+  if (!titleBox) throw new Error("Node title textarea is not visible");
+  const beforeViewport = await getViewportState(page);
+
+  await page.mouse.move(titleBox.x + titleBox.width / 2, titleBox.y + titleBox.height / 2);
+  await page.mouse.wheel(36, 72);
+
+  await expect
+    .poll(async () => {
+      const viewport = await getViewportState(page);
+      return Math.abs(viewport.x - beforeViewport.x) + Math.abs(viewport.y - beforeViewport.y);
+    })
+    .toBeGreaterThan(20);
+  const afterViewport = await getViewportState(page);
+  expect(afterViewport.zoom).toBeCloseTo(beforeViewport.zoom, 5);
+  expect(afterViewport.x).toBeLessThan(beforeViewport.x);
+  expect(afterViewport.y).toBeLessThan(beforeViewport.y);
+});
+
+test("pinch-like wheel deltas zoom smoothly around the pointer", async ({ page, isMobile }) => {
   test.skip(isMobile, "Desktop wheel input is covered separately from mobile touch basics.");
 
   await page.goto("/");
@@ -214,8 +285,7 @@ test("small wheel deltas zoom smoothly around the pointer", async ({ page, isMob
   const beforeBox = await node.locator.boundingBox();
   if (!beforeBox) throw new Error("Node box is unavailable before wheel zoom");
 
-  await page.mouse.move(pointer.x, pointer.y);
-  await page.mouse.wheel(0, -20);
+  await dispatchPinchLikeWheel(page, pointer, -20);
 
   await expect
     .poll(async () => (await getViewportState(page)).zoom)
@@ -622,6 +692,22 @@ test("title editing does not resize or relayout the canvas", async ({ page, isMo
   expect((await getPlaygroundDocument(page)).nodes["resize-root"]?.position).toEqual(
     beforePosition,
   );
+});
+
+test("node title alignment switches between single and multiline rows", async ({
+  page,
+  isMobile,
+}) => {
+  test.skip(isMobile, "Desktop title text rendering is covered separately.");
+
+  await page.goto("/");
+  const title = page.locator('.react-flow__node[data-id="node-0"] textarea');
+
+  await expect(title).toHaveCSS("text-align", "center");
+  await title.fill("A root title long enough to wrap across more than one visual line in the node");
+  await expect(title).toHaveCSS("text-align", "left");
+  await title.fill("Short root");
+  await expect(title).toHaveCSS("text-align", "center");
 });
 
 test("dragging to node center reparents as a child on release", async ({ page, isMobile }) => {

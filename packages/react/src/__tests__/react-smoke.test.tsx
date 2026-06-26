@@ -517,6 +517,42 @@ describe("@my-mind-node/react", () => {
     expect(onOpenLink).toHaveBeenCalledWith("https://example.com", node);
   });
 
+  it("marks only multiline default node titles for left alignment", () => {
+    const singleLineNode = createNode({ id: asNodeId("first"), title: "First" });
+    renderMindNode({ node: singleLineNode });
+
+    const singleLineTitle = screen.getByLabelText("Title for First");
+    expect(singleLineTitle.classList.contains("mmn-node__title--multiline")).toBe(false);
+
+    fireEvent.change(singleLineTitle, { target: { value: "First line\nSecond line" } });
+    expect(singleLineTitle.classList.contains("mmn-node__title--multiline")).toBe(true);
+
+    cleanup();
+    const readonlyNode = createNode({
+      id: asNodeId("readonly"),
+      title: "Readonly line one\nReadonly line two",
+    });
+    renderMindNode({ node: readonlyNode, readonly: true, onEnterNodeView: vi.fn() });
+
+    expect(
+      screen
+        .getByRole("button", { name: /Readonly line one\s+Readonly line two/ })
+        .classList.contains("mmn-node__title--multiline"),
+    ).toBe(true);
+  });
+
+  it("keeps multiline alignment classes out of custom node renderers", () => {
+    const node = createNode({
+      id: asNodeId("custom"),
+      title: "Custom line one\nCustom line two",
+    });
+    const renderNode = vi.fn(() => <span>Custom renderer</span>);
+    const { container } = renderMindNode({ node, renderNode });
+
+    expect(container.querySelector(".mmn-node__custom")).toBeTruthy();
+    expect(container.querySelector(".mmn-node__title--multiline")).toBeNull();
+  });
+
   it("derives link data in flow nodes without wrapping custom renderers", () => {
     const document = createEmptyDocument({ rootTitle: "https://root.example" });
     const childId = asNodeId("child");

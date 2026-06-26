@@ -31,16 +31,19 @@ through `onError`.
 
 ## React viewport and controls
 
-`ViewportConfig` supports `zoomOnScroll`, `panOnDrag`, `fitViewOnInit`,
-`fitViewOnResize`, `wheelZoomSensitivity`, and `wheelZoomMaxStep`.
-`fitViewOnResize` preserves the current zoom and only recenters when the
-container size changes.
+`ViewportConfig` supports `panOnScroll`, `wheelPanSensitivity`, `zoomOnPinch`,
+`zoomOnScroll`, `panOnDrag`, `fitViewOnInit`, `fitViewOnResize`,
+`wheelZoomSensitivity`, and `wheelZoomMaxStep`. Ordinary wheel and trackpad
+scroll pan by default. Pinch-like wheel and touch pinch zoom by default;
+`zoomOnScroll` preserves the legacy ordinary-wheel zoom path when
+`panOnScroll: false`. `fitViewOnResize` preserves the current zoom and only
+recenters when the container size changes.
 
 `MiniMapConfig` is opt-in:
 
 ```tsx
 <MindMapEditor
-  viewport={{ zoomOnScroll: true, fitViewOnResize: true }}
+  viewport={{ panOnScroll: true, zoomOnPinch: true, fitViewOnResize: true }}
   minimap={{ visible: true, pannable: true, zoomable: true }}
 />
 ```

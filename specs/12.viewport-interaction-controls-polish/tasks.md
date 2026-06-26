@@ -43,10 +43,10 @@
 
 ### 功能 4: v2 视口输入与节点文本对齐
 
-- [ ] T-014: 扩展 `ViewportConfig` 与 `MindMapEditor` wheel handler，区分普通滚轮/触控板滚动与 pinch-like zoom，并实现普通滚轮平移 viewport 且不写入 history ~1h
-- [ ] T-015: 启用可配置 `zoomOnPinch`，让触屏双指 pinch 和触控板 pinch-like wheel 可以按手势中心缩放，同时保留 `minZoom` / `maxZoom` 与缩放灵敏度限制 ~45min
-- [ ] T-016: 在 `MindNode` 为 editable、readonly、link 标题按视觉行数追加多行 class，CSS 实现单行居中、多行左对齐，自定义 `renderNode` 不受影响 ~45min
-- [ ] T-017: 补充 React 单元测试与 Playwright E2E，覆盖滚轮平移、pinch/ctrl-wheel 缩放、单行标题居中、多行标题左对齐，并运行 `pnpm typecheck`、`pnpm test`、`pnpm e2e`、`git diff --check` ~1h
+- [x] T-014: 扩展 `ViewportConfig` 与 `MindMapEditor` wheel handler，区分普通滚轮/触控板滚动与 pinch-like zoom，并实现普通滚轮平移 viewport 且不写入 history ~1h
+- [x] T-015: 启用可配置 `zoomOnPinch`，让触屏双指 pinch 和触控板 pinch-like wheel 可以按手势中心缩放，同时保留 `minZoom` / `maxZoom` 与缩放灵敏度限制 ~45min
+- [x] T-016: 在 `MindNode` 为 editable、readonly、link 标题按视觉行数追加多行 class，CSS 实现单行居中、多行左对齐，自定义 `renderNode` 不受影响 ~45min
+- [x] T-017: 补充 React 单元测试与 Playwright E2E，覆盖滚轮平移、pinch/ctrl-wheel 缩放、单行标题居中、多行标题左对齐，并运行 `pnpm typecheck`、`pnpm test`、`pnpm e2e`、`git diff --check` ~1h
 
 ## 依赖关系
 

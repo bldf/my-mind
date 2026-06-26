@@ -1,5 +1,15 @@
 # Changelog
 
+## 2026-06-26 - Viewport Interaction Controls Polish v2
+
+完成 `12.viewport-interaction-controls-polish/` 的 v2 追加任务，补齐 viewport 输入与节点标题对齐：
+
+- 普通 wheel / 触控板滚动默认平移 viewport，不写入文档或 history。
+- pinch-like wheel 和触屏 pinch 执行锚点缩放，并新增 `panOnScroll`、`zoomOnPinch`、`wheelPanSensitivity` viewport 配置。
+- 默认节点标题按视觉行数动态切换：单行居中，多行左对齐；自定义 `renderNode` 不被覆盖。
+- 更新 README、React guide 和 API reference 中的 viewport 行为说明。
+- `tasks.md` 共 17 个任务均已标记为 `[x]`。
+
 ## 2026-06-20 - Hyperlink Node Navigation
 
 完成 `11.hyperlink-node-navigation/`，让只读超链接节点与 Inspector links 共用安全打开路径：

@@ -8,7 +8,7 @@ editing, importing, exporting, and documenting structured mind map data.
 This repository is a pnpm workspace:
 
 - `packages/core` — DOM-free schema, validation, commands, history, layout graph conversion, search, JSON and indented-text serialization.
-- `packages/react` — React Flow editor/viewer, anchored wheel zoom, responsive recentering, fullscreen toggle, subtree drag previews, history controls, opt-in MiniMap, safe hyperlink nodes, themes, outline editing, search, inspector, node sizing, and E2E-facing styles.
+- `packages/react` — React Flow editor/viewer, wheel/trackpad pan, anchored pinch-like zoom, responsive recentering, fullscreen toggle, subtree drag previews, history controls, opt-in MiniMap, safe hyperlink nodes, themes, outline editing, search, inspector, node sizing, and E2E-facing styles.
 - `packages/importers` — optional JSON, Markdown, OPML, and indented-text import package.
 - `packages/exporters` — optional JSON, Markdown, OPML, indented-text, SVG, and browser PNG export package.
 - `apps/playground` — Vite playground with JSON editing and live preview.
@@ -45,7 +45,7 @@ export function Example() {
     <MindMapEditor
       defaultValue={createEmptyDocument()}
       height={640}
-      viewport={{ zoomOnScroll: true }}
+      viewport={{ panOnScroll: true, zoomOnPinch: true }}
     />
   );
 }
@@ -53,7 +53,9 @@ export function Example() {
 
 The editable toolbar includes undo, redo, and reset-to-mount-state controls.
 `MindMapViewer` omits editing history controls. MiniMap is hidden by default and
-can be enabled with `minimap={{ visible: true }}`.
+can be enabled with `minimap={{ visible: true }}`. Ordinary wheel and trackpad
+scroll pan the canvas by default; pinch-like wheel and touch pinch zoom around
+the gesture anchor.
 
 ## Verification
 

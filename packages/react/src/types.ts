@@ -47,11 +47,14 @@ export interface BreadcrumbConfig {
 
 export interface ViewportConfig {
   zoomOnScroll?: boolean;
+  zoomOnPinch?: boolean;
   panOnDrag?: boolean;
+  panOnScroll?: boolean;
   fitViewOnInit?: boolean;
   fitViewOnResize?: boolean;
   wheelZoomSensitivity?: number;
   wheelZoomMaxStep?: number;
+  wheelPanSensitivity?: number;
 }
 
 export interface MiniMapConfig {

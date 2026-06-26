@@ -8,11 +8,15 @@ fullscreen, zoom, fit view, search, and the inspector. Readonly editors and
 `MindMapViewer` omit editing history controls. Setting `search.hidden` removes
 the search entry even when a custom toolbar control list includes it.
 
-Wheel zoom is opt-in with `viewport.zoomOnScroll`. It uses pointer-anchored
-linear scaling, with `wheelZoomSensitivity` and `wheelZoomMaxStep` available for
-host tuning. Container resize automatically recenters the visible map at the
-current zoom unless `fitViewOnResize` is false, and pauses while dragging,
-resizing, or editing inside the canvas.
+Ordinary wheel and trackpad scroll pan the viewport by default. Use
+`viewport.panOnScroll` and `wheelPanSensitivity` to disable or tune that motion.
+Pinch-like wheel events and touch pinch zoom around the gesture anchor by
+default through `zoomOnPinch`; `wheelZoomSensitivity` and `wheelZoomMaxStep`
+tune wheel-reported pinch deltas. Hosts that need legacy ordinary wheel zoom can
+set `panOnScroll: false` with `zoomOnScroll: true`. Container resize
+automatically recenters the visible map at the current zoom unless
+`fitViewOnResize` is false, and pauses while dragging, resizing, or editing
+inside the canvas.
 
 MiniMap is hidden by default. Enable it explicitly; `pannable` and `zoomable`
 default to true:

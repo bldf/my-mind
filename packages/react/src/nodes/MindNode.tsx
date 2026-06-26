@@ -124,6 +124,24 @@ export const MindNode = memo(function MindNode(props: NodeProps) {
   const linkLabel = link?.label ?? link?.url;
   const collapseLabel = node.collapsed ? "Expand node" : "Collapse node";
   const resizeStep = data.nodeResizeStep ?? 0.1;
+  const readonlyTitleRows = getTextareaRows(node.title, nodeWidth);
+  const editableTitleRows = getTextareaRows(draft, nodeWidth);
+  const readonlyTitleClassName = [
+    "mmn-node__title",
+    "mmn-node__title--readonly",
+    link ? "mmn-node__title--link nodrag nopan" : "",
+    readonlyTitleRows > 1 ? "mmn-node__title--multiline" : "",
+  ]
+    .filter(Boolean)
+    .join(" ");
+  const editableTitleClassName = [
+    "mmn-node__title",
+    "mmn-node__title--editable",
+    link ? "mmn-node__title--link" : "",
+    editableTitleRows > 1 ? "mmn-node__title--multiline" : "",
+  ]
+    .filter(Boolean)
+    .join(" ");
 
   useEffect(() => {
     setDraft(node.title);
@@ -278,7 +296,7 @@ export const MindNode = memo(function MindNode(props: NodeProps) {
         <div className="mmn-node__custom">{data.renderNode(node, Boolean(props.selected))}</div>
       ) : data.readonly && link ? (
         <button
-          className="mmn-node__title mmn-node__title--readonly mmn-node__title--link nodrag nopan"
+          className={readonlyTitleClassName}
           type="button"
           aria-label={`Open link ${linkLabel} from ${node.title}`}
           onPointerDown={(event) => event.stopPropagation()}
@@ -293,7 +311,7 @@ export const MindNode = memo(function MindNode(props: NodeProps) {
         </button>
       ) : data.readonly ? (
         <button
-          className="mmn-node__title mmn-node__title--readonly"
+          className={readonlyTitleClassName}
           type="button"
           onClick={() => data.onEnterNodeView?.(node.id)}
         >
@@ -302,15 +320,9 @@ export const MindNode = memo(function MindNode(props: NodeProps) {
       ) : (
         <>
           <textarea
-            className={[
-              "mmn-node__title",
-              "mmn-node__title--editable",
-              link ? "mmn-node__title--link" : "",
-            ]
-              .filter(Boolean)
-              .join(" ")}
+            className={editableTitleClassName}
             value={draft}
-            rows={getTextareaRows(draft, nodeWidth)}
+            rows={editableTitleRows}
             aria-label={`Title for ${node.title}`}
             onChange={(event) => setDraft(event.target.value)}
             onBlur={() => data.onTitleCommit?.(node.id, getCommittedTitle(draft))}

@@ -88,7 +88,21 @@ const CANVAS_MIN_ZOOM = 0.08;
 const CANVAS_MAX_ZOOM = 2;
 const DEFAULT_WHEEL_ZOOM_SENSITIVITY = 0.001;
 const DEFAULT_WHEEL_ZOOM_MAX_STEP = 0.18;
+const DEFAULT_WHEEL_PAN_SENSITIVITY = 1;
 const EDIT_HISTORY_CONTROLS = new Set<ViewToolbarControl>(["undo", "redo", "reset"]);
+const WHEEL_IGNORE_SELECTOR = [
+  "input",
+  "textarea",
+  "select",
+  "[contenteditable]:not([contenteditable='false'])",
+  ".mmn-toolbar",
+  ".mmn-theme-panel",
+  ".mmn-search-panel",
+  ".mmn-inspector",
+  ".mmn-breadcrumbs",
+  ".mmn-node__resize-handle",
+  ".mmn-node__link-btn",
+].join(",");
 
 interface HistoryState {
   past: MindMapOperation[];
@@ -123,10 +137,43 @@ function clamp(value: number, min: number, max: number): number {
   return Math.min(max, Math.max(min, value));
 }
 
-function normalizeWheelDelta(event: Pick<WheelEvent, "deltaMode" | "deltaY">): number {
-  if (event.deltaMode === 1) return event.deltaY * 16;
-  if (event.deltaMode === 2) return event.deltaY * 160;
-  return event.deltaY;
+function normalizeWheelDelta(value: number, deltaMode: number): number {
+  if (deltaMode === 1) return value * 16;
+  if (deltaMode === 2) return value * 160;
+  return value;
+}
+
+function isPinchLikeWheel(event: WheelEvent): boolean {
+  return event.ctrlKey || event.metaKey;
+}
+
+function isScrollableWheelTarget(target: Element, boundary: HTMLElement): boolean {
+  let element: Element | null = target;
+  while (element && element !== boundary) {
+    if (element instanceof HTMLElement) {
+      const style = element.ownerDocument.defaultView?.getComputedStyle(element);
+      const overflowX = style?.overflowX ?? "";
+      const overflowY = style?.overflowY ?? "";
+      const canScrollX =
+        element.scrollWidth > element.clientWidth && /auto|scroll|overlay/.test(overflowX);
+      const canScrollY =
+        element.scrollHeight > element.clientHeight && /auto|scroll|overlay/.test(overflowY);
+      if (canScrollX || canScrollY) return true;
+    }
+    element = element.parentElement;
+  }
+  return false;
+}
+
+function shouldIgnoreViewportWheel(event: WheelEvent, boundary: HTMLElement): boolean {
+  if (!(event.target instanceof Element)) return false;
+  if (event.target.closest(".mmn-node__title") !== null) {
+    return isScrollableWheelTarget(event.target, boundary);
+  }
+  return (
+    event.target.closest(WHEEL_IGNORE_SELECTOR) !== null ||
+    isScrollableWheelTarget(event.target, boundary)
+  );
 }
 
 function documentsEqual(first: MindMapDocument, second: MindMapDocument): boolean {
@@ -808,59 +855,100 @@ function EditorCanvas(props: MindMapEditorProps) {
     );
   }, [flowData]);
 
-  const onWheelZoom = useCallback(
+  const onViewportWheel = useCallback(
     (event: WheelEvent) => {
-      if (props.viewport?.zoomOnScroll !== true) return;
       const flowElement = event.currentTarget as HTMLElement | null;
-      if (!flowElement) return;
+      if (!flowElement || shouldIgnoreViewportWheel(event, flowElement)) return;
+
+      const panOnScroll = props.viewport?.panOnScroll !== false;
+      const pinchLikeWheel = isPinchLikeWheel(event);
+      const shouldZoom =
+        (pinchLikeWheel && props.viewport?.zoomOnPinch !== false) ||
+        (!pinchLikeWheel && !panOnScroll && props.viewport?.zoomOnScroll === true);
+
+      if (shouldZoom) {
+        event.preventDefault();
+        event.stopPropagation();
+
+        const sensitivity = Math.max(
+          0,
+          props.viewport?.wheelZoomSensitivity ?? DEFAULT_WHEEL_ZOOM_SENSITIVITY,
+        );
+        const maxStep = clamp(
+          props.viewport?.wheelZoomMaxStep ?? DEFAULT_WHEEL_ZOOM_MAX_STEP,
+          0.01,
+          0.95,
+        );
+        const delta = normalizeWheelDelta(event.deltaY, event.deltaMode);
+        const step = clamp(-delta * sensitivity, -maxStep, maxStep);
+        if (step === 0) return;
+
+        const viewport = flow.getViewport();
+        const nextZoom = clamp(viewport.zoom * (1 + step), CANVAS_MIN_ZOOM, CANVAS_MAX_ZOOM);
+        if (nextZoom === viewport.zoom) return;
+
+        const bounds = flowElement.getBoundingClientRect();
+        const pointerX = event.clientX - bounds.left;
+        const pointerY = event.clientY - bounds.top;
+        const flowX = (pointerX - viewport.x) / viewport.zoom;
+        const flowY = (pointerY - viewport.y) / viewport.zoom;
+
+        void flow.setViewport({
+          x: pointerX - flowX * nextZoom,
+          y: pointerY - flowY * nextZoom,
+          zoom: nextZoom,
+        });
+        return;
+      }
+
+      if (pinchLikeWheel || !panOnScroll) return;
+
+      const panSensitivity = Math.max(
+        0,
+        props.viewport?.wheelPanSensitivity ?? DEFAULT_WHEEL_PAN_SENSITIVITY,
+      );
+      const deltaX = normalizeWheelDelta(event.deltaX, event.deltaMode) * panSensitivity;
+      const deltaY = normalizeWheelDelta(event.deltaY, event.deltaMode) * panSensitivity;
+      if (deltaX === 0 && deltaY === 0) return;
 
       event.preventDefault();
       event.stopPropagation();
 
-      const sensitivity = Math.max(
-        0,
-        props.viewport?.wheelZoomSensitivity ?? DEFAULT_WHEEL_ZOOM_SENSITIVITY,
-      );
-      const maxStep = clamp(
-        props.viewport?.wheelZoomMaxStep ?? DEFAULT_WHEEL_ZOOM_MAX_STEP,
-        0.01,
-        0.95,
-      );
-      const delta = normalizeWheelDelta(event);
-      const step = clamp(-delta * sensitivity, -maxStep, maxStep);
-      if (step === 0) return;
-
       const viewport = flow.getViewport();
-      const nextZoom = clamp(viewport.zoom * (1 + step), CANVAS_MIN_ZOOM, CANVAS_MAX_ZOOM);
-      if (nextZoom === viewport.zoom) return;
-
-      const bounds = flowElement.getBoundingClientRect();
-      const pointerX = event.clientX - bounds.left;
-      const pointerY = event.clientY - bounds.top;
-      const flowX = (pointerX - viewport.x) / viewport.zoom;
-      const flowY = (pointerY - viewport.y) / viewport.zoom;
-
       void flow.setViewport({
-        x: pointerX - flowX * nextZoom,
-        y: pointerY - flowY * nextZoom,
-        zoom: nextZoom,
+        x: viewport.x - deltaX,
+        y: viewport.y - deltaY,
+        zoom: viewport.zoom,
       });
     },
     [
       flow,
+      props.viewport?.panOnScroll,
+      props.viewport?.wheelPanSensitivity,
       props.viewport?.wheelZoomMaxStep,
       props.viewport?.wheelZoomSensitivity,
+      props.viewport?.zoomOnPinch,
       props.viewport?.zoomOnScroll,
     ],
   );
 
   useEffect(() => {
     const flowElement = containerRef.current?.querySelector<HTMLElement>(".react-flow");
-    if (!flowElement || props.viewport?.zoomOnScroll !== true) return;
+    const shouldHandleWheel =
+      props.viewport?.panOnScroll !== false ||
+      props.viewport?.zoomOnPinch !== false ||
+      props.viewport?.zoomOnScroll === true;
+    if (!flowElement || !shouldHandleWheel) return;
 
-    flowElement.addEventListener("wheel", onWheelZoom, { capture: true, passive: false });
-    return () => flowElement.removeEventListener("wheel", onWheelZoom, { capture: true });
-  }, [flowData.nodes.length, onWheelZoom, props.viewport?.zoomOnScroll]);
+    flowElement.addEventListener("wheel", onViewportWheel, { capture: true, passive: false });
+    return () => flowElement.removeEventListener("wheel", onViewportWheel, { capture: true });
+  }, [
+    flowData.nodes.length,
+    onViewportWheel,
+    props.viewport?.panOnScroll,
+    props.viewport?.zoomOnPinch,
+    props.viewport?.zoomOnScroll,
+  ]);
 
   const onNodesChange = useCallback<OnNodesChange<MindFlowNode>>((changes) => {
     setFlowNodes((currentNodes) => applyNodeChanges(changes, currentNodes));
@@ -1387,7 +1475,7 @@ function EditorCanvas(props: MindMapEditorProps) {
           minZoom={CANVAS_MIN_ZOOM}
           maxZoom={CANVAS_MAX_ZOOM}
           zoomOnScroll={false}
-          zoomOnPinch={false}
+          zoomOnPinch={props.viewport?.zoomOnPinch ?? true}
           panOnDrag={props.viewport?.panOnDrag ?? true}
           nodesDraggable={!readonly && dragSettings.enabled}
           nodesConnectable={false}

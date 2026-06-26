@@ -31,3 +31,8 @@
 - 子树拖拽需要区分 `visualNodeIds` 与 `commitNodeIds`：可见后代跟随视觉位移并从 drop target 中排除，但命中矩形和最终 `node.moveMany` 仍只使用顶层提交节点，否则大子树外接框会破坏原有 reparent/sort 区域。
 - 容器 `ResizeObserver` 不应依赖 `nodesInitialized` 或渲染节点数量重建；拖拽提交后的节点重初始化会让首次 observer 回调把 `clientWidth` 与 `contentRect` 差异误判为 resize。首次回调只建立同口径尺寸基线，后续真实宽高变化才触发保留当前 zoom 的居中。
 - Playwright 在读取节点 bounding box 前应等待初始 viewport transform 连续稳定，避免异步 `fitView` 让鼠标坐标过期并制造拖拽假失败。
+
+## 2026-06-26 - Viewport Interaction Controls Polish / wheel 平移与 pinch 分类
+
+- v2 之后普通 wheel / 触控板滚动默认只平移 viewport；trackpad pinch-like wheel 通过 `ctrlKey` / `metaKey` 进入锚点缩放。需要旧版普通 wheel 缩放的宿主必须同时设置 `panOnScroll: false` 与 `zoomOnScroll: true`。
+- 多行节点标题左对齐复用 `getTextareaRows` 的 layout 估算，避免引入 DOM 行盒测量；如果未来字体或宽度覆盖更复杂，再考虑真实测量。
