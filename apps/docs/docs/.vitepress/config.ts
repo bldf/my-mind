@@ -3,7 +3,7 @@ import { defineConfig } from "vitepress";
 export default defineConfig({
   title: "My Mind Node",
   description: "Embeddable mind map editor and viewer for React",
-  base: "/my-mind-node/",
+  base: "/my-mind/",
   themeConfig: {
     nav: [
       { text: "Guide", link: "/guide" },
