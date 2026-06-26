@@ -1,0 +1,37 @@
+{
+  "version": "1.0",
+  "name": "my-mind-node-smoke",
+  "description": "Minimal harness smoke suite for workspace quality and playground readiness.",
+  "commands": [
+    {
+      "name": "architecture lint",
+      "command": "make lint-arch",
+      "purpose": "Validate dependency layers and harness documentation contracts."
+    },
+    {
+      "name": "typecheck",
+      "command": "pnpm typecheck",
+      "purpose": "Validate TypeScript package and playground contracts."
+    },
+    {
+      "name": "unit and metadata tests",
+      "command": "pnpm test",
+      "purpose": "Run package metadata tests, package unit tests, and benchmark generation."
+    },
+    {
+      "name": "build",
+      "command": "pnpm build",
+      "purpose": "Build packages, playground, and VitePress docs."
+    },
+    {
+      "name": "bundle budget",
+      "command": "pnpm bundle",
+      "purpose": "Check gzip budgets after build artifacts exist."
+    }
+  ],
+  "browser": {
+    "start_command": "harness/scripts/start-server.sh playground",
+    "url": "http://127.0.0.1:5187",
+    "playwright_command": "pnpm e2e"
+  }
+}

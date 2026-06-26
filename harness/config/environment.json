@@ -1,0 +1,102 @@
+{
+  "version": "2.0",
+  "project": {
+    "name": "my-mind-node",
+    "type": "hybrid",
+    "language": "typescript",
+    "description": "pnpm workspace for a DOM-free mind map core, React Flow editor/viewer, optional import/export adapters, examples, docs, and agent harness assets."
+  },
+  "runtime": {
+    "language": "typescript",
+    "version": "Node.js 22 in CI; local Node version is not pinned",
+    "package_manager": "pnpm@9.15.0",
+    "build_command": "pnpm build",
+    "test_command": "pnpm test",
+    "lint_command": "make lint-arch && pnpm lint"
+  },
+  "startup": {
+    "command": "pnpm",
+    "args": ["--filter", "@my-mind-node/playground", "dev"],
+    "working_dir": ".",
+    "env": {},
+    "readiness": {
+      "type": "http",
+      "config": {
+        "url": "http://127.0.0.1:5187",
+        "expected_status": 200,
+        "timeout_seconds": 30,
+        "poll_interval_ms": 500
+      }
+    }
+  },
+  "services": [],
+  "env_vars": {
+    "required": {},
+    "optional": {}
+  },
+  "endpoints": {
+    "base_url": "http://127.0.0.1:5187",
+    "playground": "http://127.0.0.1:5187"
+  },
+  "commands": {
+    "install": "pnpm install",
+    "dev_playground": "pnpm --filter @my-mind-node/playground dev",
+    "dev_docs": "pnpm --filter @my-mind-node/docs dev",
+    "build": "pnpm build",
+    "test": "pnpm test",
+    "typecheck": "pnpm typecheck",
+    "lint": "pnpm lint",
+    "lint_arch": "make lint-arch",
+    "e2e": "pnpm e2e",
+    "bundle": "pnpm bundle"
+  },
+  "functional_scenarios": [
+    {
+      "name": "playground_import_edit_export_loop",
+      "description": "Open the Vite playground, import or edit JSON/Markdown/Mermaid, render the canvas, and export through the adapter package.",
+      "requires": ["playground"],
+      "category": "frontend",
+      "steps_hint": [
+        "Start harness/scripts/start-server.sh playground",
+        "Open http://127.0.0.1:5187",
+        "Use the data pane to import structured text",
+        "Verify the React Flow canvas renders nodes and toolbar actions remain available"
+      ],
+      "priority": "high"
+    },
+    {
+      "name": "package_quality_gate",
+      "description": "Run architecture lint, TypeScript checks, unit tests, build, and bundle budget checks before landing package changes.",
+      "requires": [],
+      "category": "quality",
+      "steps_hint": [
+        "make lint-arch",
+        "pnpm typecheck",
+        "pnpm test",
+        "pnpm build",
+        "pnpm bundle"
+      ],
+      "priority": "high"
+    }
+  ],
+  "scripts": {
+    "setup": "harness/scripts/setup-env.sh",
+    "start": "harness/scripts/start-server.sh",
+    "teardown": "harness/scripts/teardown-env.sh"
+  },
+  "_meta": {
+    "generated_by": "harness-creator",
+    "generated_at": "2026-06-26T00:00:00+08:00",
+    "schema_version": "2.0",
+    "mode": "autonomous",
+    "requires_user_input": [],
+    "assumptions": [
+      "No database, cache, broker, Docker, Kubernetes, or runtime environment variables were detected.",
+      "The playground Vite server on 127.0.0.1:5187 is the default executable target because Playwright uses it.",
+      "Node.js 22 is used in GitHub Actions; package.json currently only pins pnpm."
+    ],
+    "todos": [
+      "Optionally add an engines.node field or .node-version if local Node version drift becomes a recurring issue."
+    ]
+  }
+}

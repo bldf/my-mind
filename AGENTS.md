@@ -1,60 +1,114 @@
-# my-mind
+# my-mind Agent Guide
 
-Codex/Claude automation workspace and implementation monorepo for My Mind Node.
+Codex/Claude automation workspace and My Mind Node implementation monorepo.
+This file is a navigation map for AI agents; detailed rules live in linked docs.
 
-## 技术栈
+## 1 Quick Start
 
-- 语言: TypeScript, React TSX, JavaScript ESM, Markdown, YAML, Bash
-- 框架: pnpm workspaces, React, React Flow, Vite, VitePress, Vitest, Playwright, tsup, Codex skills/prompts, Claude slash commands
-- 包管理: pnpm `9.15.0`
-
-## 常用命令
-
-- 安装依赖: `pnpm install`
-- 开发运行: `pnpm --filter @my-mind-node/playground dev`
-- 构建: `pnpm build`
-- 测试: `pnpm test`
-- Typecheck: `pnpm typecheck`
-- Lint: `pnpm lint`
-- E2E: `pnpm e2e`
-- Fixtures: `pnpm fixtures`
-- Bench: `pnpm bench`
-- Bundle: `pnpm bundle`
-- 格式/空白检查: `git diff --check`
-
-## 目录结构
-
-```text
-.
-├── docs/                     # My Mind Node 产品/需求文档
-├── specs/                    # 从 PRD 拆分的 my-ai-auto-dev 编号 feature specs
-├── packages/
-│   ├── core/                 # DOM-free schema、校验、命令、历史、搜索与布局转换
-│   ├── react/                # React Flow Editor/Viewer、大纲、搜索、检查器和样式
-│   ├── importers/            # 可选 JSON/Markdown/OPML/缩进文本导入
-│   └── exporters/            # 可选 JSON/Markdown/OPML/缩进文本/SVG/PNG 导出
-├── apps/
-│   ├── playground/           # Vite 示例与 E2E 目标
-│   ├── docs/                 # VitePress 文档站
-│   ├── next-example/         # Next.js SSR-safe 示例
-│   ├── readonly-example/     # 只读 Viewer 示例
-│   └── custom-node-example/  # 自定义节点渲染示例
-├── tests/                    # fixtures、bench、a11y、Playwright E2E
-├── scripts/                  # fixture、bench、bundle budget 脚本
-├── .agents/
-│   ├── agents/               # Codex subagent 定义
-│   ├── prompts/              # Codex slash prompts 与 my-ai 节点
-│   ├── rules/                # Codex 项目规则
-│   └── skills/               # 本地 Codex skills 与辅助脚本
-└── .claude/
-    └── commands/             # Claude slash commands 与 my-ai 节点
-```
-
-## 项目规则
-
-Codex 执行任务前应读取：
+Read these files before changing code, docs, prompts, skills, or scripts:
 
 - `.agents/rules/coding-style.md`
 - `.agents/rules/testing.md`
 - `.agents/rules/security.md`
 - `.agents/rules/git-workflow.md`
+- `docs/ARCHITECTURE.md`
+- `docs/DEVELOPMENT.md`
+- `docs/QUALITY.md`
+
+## 2 Tech Stack
+
+- Language: TypeScript, React TSX, JavaScript ESM, Markdown, YAML, Bash.
+- Frameworks: pnpm workspaces, React, React Flow, Vite, VitePress, Vitest, Playwright, tsup.
+- Agent assets: Codex prompts, skills, agents, project rules, numbered feature specs.
+- Package manager: pnpm `9.15.0`.
+
+## 3 Common Commands
+
+```bash
+pnpm install                              # install dependencies
+pnpm --filter @my-mind-node/playground dev # run playground on 127.0.0.1:5187
+pnpm build                                # build packages, playground, docs
+pnpm test                                 # package metadata, unit tests, bench
+pnpm typecheck                            # package and playground TS checks
+pnpm lint                                 # ESLint
+pnpm e2e                                  # Playwright browser matrix
+pnpm fixtures                             # regenerate JSON fixtures
+pnpm bench                                # regenerate benchmark markdown
+pnpm bundle                               # gzip budget check
+make lint-arch                            # harness dependency and quality lint
+git diff --check                          # whitespace/conflict marker check
+```
+
+## 4 Architecture Map
+
+| Section | Document | Purpose |
+| --- | --- | --- |
+| 4.1 | `docs/ARCHITECTURE.md` | Workspace layers, dependency graph, critical flows |
+| 4.2 | `docs/design-docs/core.md` | DOM-free document model, commands, validation, layout |
+| 4.3 | `docs/design-docs/react.md` | React Flow editor/viewer, outline, panels, drag UX |
+| 4.4 | `docs/design-docs/import-export.md` | Optional import/export adapters and format rules |
+| 4.5 | `docs/design-docs/playground-and-examples.md` | Vite playground, docs app, examples, E2E target |
+
+## 5 Package Boundaries
+
+| Layer | Path | Rule |
+| --- | --- | --- |
+| L0 | `packages/core/` | DOM-free schema, validation, commands, history, layout, search |
+| L1 | `packages/importers/` | Optional text/JSON/OPML/Mermaid adapters over `core` |
+| L1 | `packages/exporters/` | Optional JSON/Markdown/OPML/SVG/PNG adapters over `core` |
+| L2 | `packages/react/` | React Flow UI adapter; may depend on `core`, not adapters |
+| L3 | `apps/*` | Demo, docs, SSR, readonly, and custom-node consumers |
+| L4 | `tests/`, `scripts/`, `harness/` | Verification, fixtures, benchmarks, harness infrastructure |
+
+Use public package imports (`@my-mind-node/core`, `@my-mind-node/react`, etc.)
+instead of deep cross-package source imports. `scripts/lint-deps.mjs` enforces the
+current dependency direction.
+
+## 6 Development Docs
+
+| Document | Scope |
+| --- | --- |
+| `docs/DEVELOPMENT.md` | prerequisites, local servers, build/test/lint matrix |
+| `docs/QUALITY.md` | quality gates, architecture lint, security and review rules |
+| `README.md` | user-facing package overview and public quick start |
+| `docs/prd-mind-map.md` | product requirements history; verify freshness before relying on it |
+| `specs/*/{requirements,design,tasks}.md` | numbered feature specs and implementation records |
+
+## 7 Harness Runtime
+
+| Path | Purpose |
+| --- | --- |
+| `harness/config/environment.json` | Runtime ecosystem contract for harness executors |
+| `harness/scripts/setup-env.sh` | Local dependency preflight; no services are started by default |
+| `harness/scripts/start-server.sh` | Starts playground/docs/examples by target name |
+| `harness/scripts/teardown-env.sh` | Documents cleanup behavior for this service-free workspace |
+| `harness/evals/smoke.json` | Minimal command suite for harness smoke verification |
+
+Do not add `harness/config/verify.json`; verification config is task-specific and
+generated by the executor from `environment.json` plus the changed files.
+
+## 8 Repository Layout
+
+```text
+.
+├── docs/                     # architecture, development, quality, PRD
+├── specs/                    # numbered my-ai-auto-dev feature specs
+├── packages/                 # publishable core/react/import/export packages
+├── apps/                     # playground, docs, SSR and renderer examples
+├── tests/                    # package metadata, fixtures, Playwright E2E
+├── scripts/                  # fixtures, bench, bundle and harness linters
+├── harness/                  # executor-facing environment and eval contracts
+├── .github/workflows/        # CI and Pages deployment
+└── .agents/                  # Codex agents, prompts, rules, skills
+```
+
+## 9 Change Discipline
+
+- Keep `packages/core` free of React, React Flow, DOM-only package imports, and adapters.
+- Keep `packages/react` free of `@my-mind-node/importers` and `@my-mind-node/exporters`.
+- Keep optional import/export packages out of the default React bundle path.
+- Keep non-test `.ts` and `.tsx` files within 800 lines; test files are exempt.
+- Run `make lint-arch` after changing package boundaries, docs, harness files, or agent maps.
+- Run the repo checks listed in `.agents/rules/testing.md` according to the files touched.
+- Never commit secrets, real `.env` files, browser sessions, local tokens, or private keys.
+- Do not revert user changes or clean unrelated tracked files as part of nearby work.
