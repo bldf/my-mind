@@ -81,6 +81,15 @@ export interface DragInteractionConfig {
   showCollapseControl?: boolean;
 }
 
+export interface BranchListLayoutConfig {
+  hidden?: boolean;
+  autoShowDepth?: number;
+  defaultOpen?: boolean;
+  defaultSidebarWidth?: number;
+  minSidebarWidth?: number;
+  maxSidebarWidthRatio?: number;
+}
+
 export interface MindMapEditorProps {
   value?: MindMapDocument;
   defaultValue?: MindMapDocument;
@@ -96,6 +105,7 @@ export interface MindMapEditorProps {
   inspector?: InspectorConfig;
   search?: SearchConfig;
   dragInteraction?: DragInteractionConfig;
+  branchListLayout?: BranchListLayoutConfig;
   className?: string;
   renderNode?: (node: MindMapNode, selected: boolean) => ReactNode;
   onChange?: (document: MindMapDocument) => void;

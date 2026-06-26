@@ -49,6 +49,24 @@ function createDocumentWithRootChildren(): MindMapDocument {
   return document;
 }
 
+function createDeepBranchListDocument(): MindMapDocument {
+  const doc = createEmptyDocument({ rootTitle: "Root" });
+  const rootId = doc.rootId;
+  const branchA = createNode({ id: asNodeId("branch-a"), parentId: rootId, title: "Branch A" });
+  const branchB = createNode({ id: asNodeId("branch-b"), parentId: rootId, title: "Branch B" });
+  const leafA = createNode({ id: asNodeId("leaf-a"), parentId: branchA.id, title: "Leaf A" });
+  const leafB = createNode({ id: asNodeId("leaf-b"), parentId: branchB.id, title: "Leaf B" });
+
+  doc.nodes[rootId]!.children = [branchA.id, branchB.id];
+  branchA.children = [leafA.id];
+  branchB.children = [leafB.id];
+  doc.nodes[branchA.id] = branchA;
+  doc.nodes[branchB.id] = branchB;
+  doc.nodes[leafA.id] = leafA;
+  doc.nodes[leafB.id] = leafB;
+  return doc;
+}
+
 function renderMindNode(data: MindNodeData, selected = false) {
   const props = {
     id: String(data.node.id),
@@ -511,7 +529,9 @@ describe("@my-mind-node/react", () => {
       onOpenLink,
     });
 
-    const linkBtn = screen.getByRole("button", { name: "Open link https://example.com from First" });
+    const linkBtn = screen.getByRole("button", {
+      name: "Open link https://example.com from First",
+    });
     fireEvent.click(linkBtn);
 
     expect(onOpenLink).toHaveBeenCalledWith("https://example.com", node);
@@ -665,15 +685,11 @@ describe("@my-mind-node/react", () => {
     const onResizeCommit = vi.fn();
 
     renderMindNode({ node, onResizeCommit }, false);
-    expect(
-      screen.queryByRole("button", { name: "Reset scale of First to default" }),
-    ).toBeNull();
+    expect(screen.queryByRole("button", { name: "Reset scale of First to default" })).toBeNull();
 
     cleanup();
     renderMindNode({ node, onResizeCommit, showNodeResizeControls: false }, true);
-    expect(
-      screen.queryByRole("button", { name: "Reset scale of First to default" }),
-    ).toBeNull();
+    expect(screen.queryByRole("button", { name: "Reset scale of First to default" })).toBeNull();
 
     cleanup();
     renderMindNode({ node, onResizeCommit }, true);
@@ -791,14 +807,17 @@ describe("@my-mind-node/react", () => {
     const onResizeProgress = vi.fn();
     const onResizeCommit = vi.fn();
 
-    renderMindNode({
-      node,
-      onResizeProgress,
-      onResizeCommit,
-      nodeMinScale: 0.5,
-      nodeMaxScale: 2.0,
-      nodeResizeStep: 0.1,
-    }, true);
+    renderMindNode(
+      {
+        node,
+        onResizeProgress,
+        onResizeCommit,
+        nodeMinScale: 0.5,
+        nodeMaxScale: 2.0,
+        nodeResizeStep: 0.1,
+      },
+      true,
+    );
 
     const handle = screen.getByRole("button", { name: "Resize First from top left" });
 
@@ -829,14 +848,17 @@ describe("@my-mind-node/react", () => {
     const onResizeProgress = vi.fn();
     const onResizeCommit = vi.fn();
 
-    renderMindNode({
-      node,
-      onResizeProgress,
-      onResizeCommit,
-      nodeMinScale: 0.5,
-      nodeMaxScale: 2.0,
-      nodeResizeStep: 0.15,
-    }, true);
+    renderMindNode(
+      {
+        node,
+        onResizeProgress,
+        onResizeCommit,
+        nodeMinScale: 0.5,
+        nodeMaxScale: 2.0,
+        nodeResizeStep: 0.15,
+      },
+      true,
+    );
 
     const handle = screen.getByRole("button", { name: "Resize First from top left" });
 
@@ -932,7 +954,118 @@ describe("@my-mind-node/react", () => {
     expect(isMoveNoOp(document, [asNodeId("first")], document.rootId, undefined)).toBe(false);
 
     // Check that drop label is undefined when noOp is true
-    expect(getDropIntentLabel({ type: "sort-before", targetId: asNodeId("second"), noOp: true })).toBeUndefined();
-    expect(getDropIntentLabel({ type: "reparent", targetId: asNodeId("root"), noOp: true })).toBeUndefined();
+    expect(
+      getDropIntentLabel({ type: "sort-before", targetId: asNodeId("second"), noOp: true }),
+    ).toBeUndefined();
+    expect(
+      getDropIntentLabel({ type: "reparent", targetId: asNodeId("root"), noOp: true }),
+    ).toBeUndefined();
+  });
+
+  it("shows branch list toggle button only when eligible", () => {
+    // 1. Shallow document: depth < 3
+    const doc2 = createEmptyDocument();
+    const rootId = doc2.rootId;
+    const nodeA = createNode({ id: asNodeId("node-a"), parentId: rootId });
+    doc2.nodes[rootId]!.children.push(nodeA.id);
+    doc2.nodes[nodeA.id] = nodeA;
+
+    const { container: container1, unmount: unmount1 } = render(<MindMapEditor value={doc2} />);
+    expect(container1.querySelector(".mmn-branch-toggle-btn")).toBeNull();
+    unmount1();
+
+    // 2. Deep document: depth >= 3
+    const nodeB = createNode({ id: asNodeId("node-b"), parentId: nodeA.id });
+    doc2.nodes[nodeA.id]!.children.push(nodeB.id);
+    doc2.nodes[nodeB.id] = nodeB;
+
+    const { container: container2, unmount: unmount2 } = render(<MindMapEditor value={doc2} />);
+    expect(container2.querySelector(".mmn-branch-toggle-btn")).toBeTruthy();
+    unmount2();
+
+    // 3. Deep document with hidden: true in branchListLayout
+    const { container: container3, unmount: unmount3 } = render(
+      <MindMapEditor value={doc2} branchListLayout={{ hidden: true }} />,
+    );
+    expect(container3.querySelector(".mmn-branch-toggle-btn")).toBeNull();
+    unmount3();
+  });
+
+  it("enters split layout and switches branch without triggering onChange", async () => {
+    const doc = createDeepBranchListDocument();
+    const onChange = vi.fn();
+    const { container } = render(<MindMapEditor value={doc} onChange={onChange} />);
+
+    // Click toggle button to enter split layout
+    const toggleBtn = container.querySelector(".mmn-branch-toggle-btn");
+    expect(toggleBtn).toBeTruthy();
+    fireEvent.click(toggleBtn!);
+
+    // Should render split shell and side panel
+    expect(container.querySelector(".mmn-branch-layout")).toBeTruthy();
+    expect(container.querySelector(".mmn-branch-list-panel")).toBeTruthy();
+
+    // By default first level-1 child is selected (Branch A)
+    const listItems = container.querySelectorAll(".mmn-branch-list-item");
+    expect(listItems).toHaveLength(2);
+    expect(listItems[0]?.getAttribute("aria-current")).toBe("page");
+
+    // Click Branch B in list to switch
+    fireEvent.click(listItems[1]!);
+    expect(listItems[1]?.getAttribute("aria-current")).toBe("page");
+
+    // Confirm that onChange was never called for this layout navigation
+    expect(onChange).not.toHaveBeenCalled();
+  });
+
+  it("opens default split layout on the first branch subtree", async () => {
+    const doc = createDeepBranchListDocument();
+    const { container } = render(
+      <MindMapEditor value={doc} branchListLayout={{ defaultOpen: true }} />,
+    );
+
+    await waitFor(() => {
+      expect(container.querySelector(".mmn-branch-layout")).toBeTruthy();
+      expect(
+        container.querySelectorAll(".mmn-branch-list-item")[0]?.getAttribute("aria-current"),
+      ).toBe("page");
+      expect(screen.getByLabelText("Title for Branch A")).toBeTruthy();
+      expect(screen.getByLabelText("Title for Leaf A")).toBeTruthy();
+      expect(screen.queryByLabelText("Title for Branch B")).toBeNull();
+    });
+  });
+
+  it("temporarily previews a collapsed branch list and pins it from the overlay", () => {
+    const doc = createDeepBranchListDocument();
+    const { container } = render(<MindMapEditor value={doc} />);
+
+    fireEvent.click(container.querySelector(".mmn-branch-toggle-btn")!);
+    fireEvent.click(screen.getByRole("button", { name: "Collapse sidebar" }));
+    expect(screen.queryByLabelText("Root branches")).toBeNull();
+
+    fireEvent.mouseEnter(screen.getByRole("button", { name: "Show branch list" }));
+    const previewPanel = screen.getByLabelText("Root branches");
+    expect(previewPanel).toBeTruthy();
+    fireEvent.mouseLeave(previewPanel);
+    expect(screen.queryByLabelText("Root branches")).toBeNull();
+
+    fireEvent.mouseEnter(screen.getByRole("button", { name: "Show branch list" }));
+    fireEvent.click(screen.getByRole("button", { name: "Pin sidebar" }));
+    expect(screen.getByLabelText("Root branches")).toBeTruthy();
+    expect(screen.queryByRole("button", { name: "Show branch list" })).toBeNull();
+
+    fireEvent.mouseLeave(screen.getByLabelText("Root branches"));
+    expect(screen.getByLabelText("Root branches")).toBeTruthy();
+  });
+
+  it("supports split layout in readonly viewer", () => {
+    const doc = createDeepBranchListDocument();
+    const { container } = render(<MindMapViewer value={doc} />);
+    const toggleBtn = container.querySelector(".mmn-branch-toggle-btn");
+    expect(toggleBtn).toBeTruthy();
+
+    fireEvent.click(toggleBtn!);
+    expect(container.querySelector(".mmn-branch-layout")).toBeTruthy();
+    expect(container.querySelector(".mmn-branch-list-panel")).toBeTruthy();
   });
 });

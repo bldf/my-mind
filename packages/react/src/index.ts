@@ -7,5 +7,8 @@ export * from "./MindMapViewer";
 export * from "./OutlineEditor";
 export * from "./components/InspectorPanel";
 export * from "./components/SearchPanel";
+export * from "./components/BranchListToggleButton";
+export * from "./components/BranchListPanel";
 export * from "./nodes/MindNode";
 export * from "./edges/BezierEdge";
+export * from "./layout-helpers";

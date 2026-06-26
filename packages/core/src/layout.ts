@@ -232,7 +232,7 @@ export function simpleTreeLayout(document: MindMapDocument, rootId: NodeId = doc
   };
 
   if (!root.collapsed) {
-    const shouldSplitRoot = rootId === document.rootId && root.children.length > 1;
+    const shouldSplitRoot = root.children.length > 1;
     const pivot = shouldSplitRoot ? Math.ceil(root.children.length / 2) : root.children.length;
     const firstSide: -1 | 1 = shouldSplitRoot ? (direction === "left" ? 1 : -1) : direction === "left" ? -1 : 1;
     const secondSide: -1 | 1 = firstSide === -1 ? 1 : -1;

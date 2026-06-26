@@ -1,5 +1,20 @@
 import { expect, test } from "@playwright/test";
 
+test.beforeEach(async ({ page }) => {
+  const originalGoto = page.goto.bind(page);
+  page.goto = async (url: string, options?: Parameters<typeof originalGoto>[1]) => {
+    const baseUrl = "http://localhost:5173";
+    const absoluteUrl = new URL(url, baseUrl);
+    if (!absoluteUrl.searchParams.has("fitViewOnInit")) {
+      absoluteUrl.searchParams.set("fitViewOnInit", "1");
+    }
+    const finalUrl = url.startsWith("/")
+      ? absoluteUrl.pathname + absoluteUrl.search + absoluteUrl.hash
+      : absoluteUrl.toString();
+    return originalGoto(finalUrl, options);
+  };
+});
+
 async function getPlaygroundDocument(page: import("@playwright/test").Page) {
   return JSON.parse(await page.getByLabel("Mind map JSON").inputValue()) as {
     rootId: string;
@@ -117,6 +132,48 @@ async function expectNodeInsideCanvas(page: import("@playwright/test").Page, nod
     .toBe(true);
 }
 
+async function expectVisibleNodesCenteredInCanvas(
+  page: import("@playwright/test").Page,
+  maxDelta = 48,
+) {
+  await expect
+    .poll(async () =>
+      page.locator(".react-flow").evaluate((flowElement) => {
+        const canvasRect = flowElement.getBoundingClientRect();
+        const nodes = Array.from(flowElement.querySelectorAll<HTMLElement>(".react-flow__node"));
+        if (nodes.length === 0) return Number.POSITIVE_INFINITY;
+
+        const bounds = nodes.reduce(
+          (current, node) => {
+            const rect = node.getBoundingClientRect();
+            return {
+              left: Math.min(current.left, rect.left),
+              top: Math.min(current.top, rect.top),
+              right: Math.max(current.right, rect.right),
+              bottom: Math.max(current.bottom, rect.bottom),
+            };
+          },
+          {
+            left: Number.POSITIVE_INFINITY,
+            top: Number.POSITIVE_INFINITY,
+            right: Number.NEGATIVE_INFINITY,
+            bottom: Number.NEGATIVE_INFINITY,
+          },
+        );
+
+        const nodeCenterX = (bounds.left + bounds.right) / 2;
+        const nodeCenterY = (bounds.top + bounds.bottom) / 2;
+        const canvasCenterX = canvasRect.left + canvasRect.width / 2;
+        const canvasCenterY = canvasRect.top + canvasRect.height / 2;
+        return Math.max(
+          Math.abs(nodeCenterX - canvasCenterX),
+          Math.abs(nodeCenterY - canvasCenterY),
+        );
+      }),
+    )
+    .toBeLessThan(maxDelta);
+}
+
 async function expectNodeTitleNotClipped(page: import("@playwright/test").Page, nodeId: string) {
   await expect
     .poll(async () =>
@@ -216,10 +273,7 @@ test("hidden search configuration removes the toolbar entry", async ({ page }) =
   await expect(page.getByRole("button", { name: "Search" })).toHaveCount(0);
 });
 
-test("ordinary wheel input pans the viewport without changing zoom", async ({
-  page,
-  isMobile,
-}) => {
+test("ordinary wheel input pans the viewport without changing zoom", async ({ page, isMobile }) => {
   test.skip(isMobile, "Desktop wheel input is covered separately from mobile touch basics.");
 
   await page.goto("/");
@@ -276,6 +330,7 @@ test("pinch-like wheel deltas zoom smoothly around the pointer", async ({ page, 
   test.skip(isMobile, "Desktop wheel input is covered separately from mobile touch basics.");
 
   await page.goto("/");
+  await waitForViewportSettled(page);
   const node = await getNodeBox(page, "node-1");
   const pointer = {
     x: node.box.x + node.box.width / 2,
@@ -481,7 +536,9 @@ test("readonly markdown link nodes open through the safe default opener", async 
     ]);
 });
 
-test("invalid input does not cover valid document and error disappears on fix", async ({ page }) => {
+test("invalid input does not cover valid document and error disappears on fix", async ({
+  page,
+}) => {
   await page.goto("/");
   await expect(page.getByLabel("Title for 100 node map")).toBeVisible();
 
@@ -630,9 +687,7 @@ test("container resize recenters a single-node document", async ({ page, isMobil
       return Math.abs(nodeCenterX - canvasCenterX);
     })
     .toBeLessThan(12);
-  await expect
-    .poll(async () => (await getViewportState(page)).x)
-    .not.toBe(beforeViewport.x);
+  await expect.poll(async () => (await getViewportState(page)).x).not.toBe(beforeViewport.x);
   await expect
     .poll(async () => (await getViewportState(page)).zoom)
     .toBeCloseTo(beforeViewport.zoom, 5);
@@ -923,4 +978,268 @@ test("multiline and long titles are saved and keep the root fully visible", asyn
     .toBe(nextTitle);
   await expect(root.locator("textarea")).toHaveValue(nextTitle);
   await expectNodeInsideCanvas(page, "node-0");
+});
+
+test.describe("Branch List Focus Layout", () => {
+  test("toggle button visibility depends on document depth", async ({ page }) => {
+    // 1. Deep document (fixture loaded by default, depth >= 3)
+    await page.goto("/");
+    await expect(page.locator(".mmn-branch-toggle-btn")).toBeVisible();
+
+    // 2. Shallow document (load single node document)
+    await loadSingleNodeResizeDocument(page);
+    await expect(page.locator(".mmn-branch-toggle-btn")).toBeHidden();
+  });
+
+  test("entering and exiting list layout via toggle button", async ({ page, isMobile }) => {
+    test.skip(isMobile, "Split layout side panel is hidden by default on mobile viewports.");
+
+    await page.goto("/");
+    await expect(page.locator(".mmn-branch-toggle-btn")).toBeVisible();
+    await expect(page.locator(".mmn-editor")).not.toHaveClass(/mmn-editor--split-mode/);
+    await expect(page.locator(".mmn-branch-list-panel")).toBeHidden();
+
+    // Enter split layout
+    await page.locator(".mmn-branch-toggle-btn").click();
+    await expect(page.locator(".mmn-editor")).toHaveClass(/mmn-editor--split-mode/);
+    await expect(page.locator(".mmn-branch-list-panel")).toBeVisible();
+
+    // Exit split layout
+    await page.locator(".mmn-branch-toggle-btn").click();
+    await expect(page.locator(".mmn-editor")).not.toHaveClass(/mmn-editor--split-mode/);
+    await expect(page.locator(".mmn-branch-list-panel")).toBeHidden();
+  });
+
+  test("clicking branch list item switches the view root node to the branch subtree", async ({
+    page,
+    isMobile,
+  }) => {
+    test.skip(isMobile, "Split layout side panel is hidden by default on mobile viewports.");
+
+    // Enable breadcrumbs so we can verify path
+    await page.goto("/?showBreadcrumbs=1");
+
+    // Enter split mode
+    await page.locator(".mmn-branch-toggle-btn").click();
+    await expect(page.locator(".mmn-branch-list-panel")).toBeVisible();
+
+    const items = page.locator(".mmn-branch-list-item");
+    await expect(items).toHaveCount(4);
+
+    const firstItem = items.first();
+    const secondItem = items.nth(1);
+
+    // First item selected by default
+    await expect(firstItem).toHaveClass(/mmn-branch-list-item--selected/);
+    await expect(secondItem).not.toHaveClass(/mmn-branch-list-item--selected/);
+
+    const secondTitle = await secondItem.locator(".mmn-branch-list-item__title").textContent();
+    expect(secondTitle).toBeTruthy();
+
+    // Click second branch item
+    await secondItem.click();
+    await expect(secondItem).toHaveClass(/mmn-branch-list-item--selected/);
+    await expect(firstItem).not.toHaveClass(/mmn-branch-list-item--selected/);
+
+    // Verify viewRootId switch via breadcrumbs: the breadcrumb path should end with the second branch's title
+    const breadcrumbButtons = page.locator(".mmn-breadcrumbs button");
+    await expect(breadcrumbButtons).toHaveCount(2); // Root + Selected Branch
+    await expect(breadcrumbButtons.nth(1)).toContainText(secondTitle!);
+  });
+
+  test("clicking branch list item recenters the selected subtree", async ({ page, isMobile }) => {
+    test.skip(isMobile, "Split layout side panel is hidden by default on mobile viewports.");
+
+    await page.goto("/?fitViewOnInit=");
+    await page.locator(".mmn-branch-toggle-btn").click();
+    await expect(page.locator(".mmn-branch-list-panel")).toBeVisible();
+
+    const secondItem = page.locator(".mmn-branch-list-item").nth(1);
+    await secondItem.click();
+    await expect(secondItem).toHaveClass(/mmn-branch-list-item--selected/);
+    await expectVisibleNodesCenteredInCanvas(page, 12);
+  });
+
+  test("fullscreen branch switching recenters the selected subtree", async ({ page, isMobile }) => {
+    test.skip(isMobile, "Split layout side panel is hidden by default on mobile viewports.");
+
+    await page.addInitScript(() => {
+      let fullscreenElement: Element | null = null;
+      Object.defineProperty(document, "fullscreenElement", {
+        configurable: true,
+        get: () => fullscreenElement,
+      });
+      Object.defineProperty(HTMLElement.prototype, "requestFullscreen", {
+        configurable: true,
+        value: async () => {
+          const target = document.querySelector<HTMLElement>(".mmn-editor");
+          fullscreenElement = target;
+          if (target) {
+            target.style.width = "1180px";
+            target.style.height = "760px";
+          }
+          document.dispatchEvent(new Event("fullscreenchange"));
+        },
+      });
+      Object.defineProperty(document, "exitFullscreen", {
+        configurable: true,
+        value: async () => {
+          if (fullscreenElement instanceof HTMLElement) {
+            fullscreenElement.style.width = "";
+            fullscreenElement.style.height = "";
+          }
+          fullscreenElement = null;
+          document.dispatchEvent(new Event("fullscreenchange"));
+        },
+      });
+    });
+
+    await page.goto("/?fitViewOnInit=");
+    await page.locator(".mmn-branch-toggle-btn").click();
+    await expect(page.locator(".mmn-branch-list-panel")).toBeVisible();
+
+    await page.getByRole("button", { name: "Fullscreen" }).click();
+    await expect(page.getByRole("button", { name: "Exit fullscreen" })).toBeVisible();
+
+    const canvas = await page.locator(".react-flow").boundingBox();
+    if (!canvas) throw new Error("React Flow canvas is not visible");
+    const beforePan = await getViewportState(page);
+    await page.mouse.move(canvas.x + canvas.width / 2, canvas.y + canvas.height / 2);
+    await page.mouse.wheel(420, 260);
+    await expect
+      .poll(async () => {
+        const viewport = await getViewportState(page);
+        return Math.abs(viewport.x - beforePan.x) + Math.abs(viewport.y - beforePan.y);
+      })
+      .toBeGreaterThan(80);
+
+    const secondItem = page.locator(".mmn-branch-list-item").nth(1);
+    await secondItem.click();
+    await expect(secondItem).toHaveClass(/mmn-branch-list-item--selected/);
+    await expectVisibleNodesCenteredInCanvas(page);
+  });
+
+  test("dragging resize handle adjusts sidebar width within constraints", async ({
+    page,
+    isMobile,
+  }) => {
+    test.skip(
+      isMobile,
+      "Desktop resize handle dragging is covered separately from mobile touch basics.",
+    );
+
+    await page.goto("/");
+    // Enter split mode
+    await page.locator(".mmn-branch-toggle-btn").click();
+    await expect(page.locator(".mmn-branch-resize-handle")).toBeVisible();
+
+    const layout = page.locator(".mmn-branch-layout");
+    const handle = page.locator(".mmn-branch-resize-handle");
+
+    // Check initial width via style custom property --mmn-branch-sidebar-width
+    let styleStr = await layout.getAttribute("style");
+    expect(styleStr).toContain("--mmn-branch-sidebar-width: 280px");
+
+    // Drag right to expand
+    const handleBox = await handle.boundingBox();
+    expect(handleBox).toBeTruthy();
+    const startX = handleBox!.x + handleBox!.width / 2;
+    const startY = handleBox!.y + handleBox!.height / 2;
+
+    await page.mouse.move(startX, startY);
+    await page.mouse.down();
+    await page.mouse.move(startX + 100, startY, { steps: 10 });
+    await page.mouse.up();
+
+    styleStr = await layout.getAttribute("style");
+    // Width should now be around 380px
+    expect(styleStr).toContain("--mmn-branch-sidebar-width: 380px");
+
+    // Drag left beyond minimum constraint (min width is 220px)
+    await page.mouse.move(startX + 100, startY);
+    await page.mouse.down();
+    await page.mouse.move(startX - 200, startY, { steps: 10 });
+    await page.mouse.up();
+
+    styleStr = await layout.getAttribute("style");
+    expect(styleStr).toContain("--mmn-branch-sidebar-width: 220px");
+  });
+
+  test("collapsed sidebar previews on edge hover and pins from the overlay", async ({ page }) => {
+    await page.goto("/");
+    await page.locator(".mmn-branch-toggle-btn").click();
+    await expect(page.locator(".mmn-branch-list-panel")).toBeVisible();
+
+    // Collapse sidebar
+    await page.getByRole("button", { name: "Collapse sidebar" }).click();
+    await expect(page.locator(".mmn-branch-list-panel")).toBeHidden();
+    await expect(page.locator(".mmn-branch-expand-btn")).toBeVisible();
+
+    // Hovering the left edge rail temporarily previews the sidebar
+    await page.getByRole("button", { name: "Show branch list" }).hover();
+    const previewPanel = page.locator(".mmn-branch-list-panel");
+    await expect(previewPanel).toBeVisible();
+    const previewBox = await previewPanel.boundingBox();
+    if (!previewBox) throw new Error("Branch list preview is not visible");
+    await page.mouse.move(
+      previewBox.x + previewBox.width + 40,
+      previewBox.y + previewBox.height / 2,
+    );
+    await expect(page.locator(".mmn-branch-list-panel")).toBeHidden();
+
+    // Pinning the preview restores the fixed split layout
+    await page.getByRole("button", { name: "Show branch list" }).hover();
+    await page.getByRole("button", { name: "Pin sidebar" }).click();
+    await expect(page.locator(".mmn-branch-list-panel")).toBeVisible();
+    await expect(page.locator(".mmn-branch-expand-btn")).toBeHidden();
+  });
+
+  test("snap toggle button to nearest edge on dragging", async ({ page, isMobile }) => {
+    test.skip(isMobile, "Desktop pointer dragging is covered separately from mobile touch basics.");
+
+    await page.goto("/");
+    const btn = page.locator(".mmn-branch-toggle-btn");
+    await expect(btn).toBeVisible();
+
+    const initialBox = await btn.boundingBox();
+    expect(initialBox).toBeTruthy();
+
+    // Drag toggle button to the middle-right area
+    await page.mouse.move(
+      initialBox!.x + initialBox!.width / 2,
+      initialBox!.y + initialBox!.height / 2,
+    );
+    await page.mouse.down();
+    // Move 500px right, 50px down
+    await page.mouse.move(
+      initialBox!.x + initialBox!.width / 2 + 500,
+      initialBox!.y + initialBox!.height / 2 + 50,
+      { steps: 10 },
+    );
+    await page.mouse.up();
+
+    // Button should snap to the right edge
+    const finalBox = await btn.boundingBox();
+    expect(finalBox).toBeTruthy();
+    expect(finalBox!.x).toBeGreaterThan(initialBox!.x + 400);
+
+    // Verify it didn't trigger list layout since we dragged past the click threshold (4px)
+    await expect(page.locator(".mmn-editor")).not.toHaveClass(/mmn-editor--split-mode/);
+  });
+
+  test("dark mode theme changes layout panels theme mode", async ({ page, isMobile }) => {
+    test.skip(isMobile, "Split layout side panel is hidden by default on mobile viewports.");
+
+    await page.goto("/");
+    await page.locator(".mmn-branch-toggle-btn").click();
+    await expect(page.locator(".mmn-branch-list-panel")).toBeVisible();
+
+    // Toggle theme to Graphite (dark mode)
+    await page.getByRole("button", { name: "Themes" }).click();
+    await page.getByRole("button", { name: "Graphite" }).click();
+
+    // Panel dark theme check (by looking at data-theme-mode on editor)
+    const editor = page.locator(".mmn-editor");
+    await expect(editor).toHaveAttribute("data-theme-mode", "dark");
+  });
 });

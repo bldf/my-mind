@@ -98,6 +98,11 @@ export default function App() {
     if (typeof window === "undefined") return false;
     return new URLSearchParams(window.location.search).get("showBreadcrumbs") === "1";
   }, []);
+  const fitViewOnInitParam = useMemo(() => {
+    if (typeof window === "undefined") return undefined;
+    const param = new URLSearchParams(window.location.search).get("fitViewOnInit");
+    return param === "1" ? true : param === "0" ? false : undefined;
+  }, []);
   const initialDocument = useMemo(() => {
     const parsed = parseDocument(JSON.stringify(fixture));
     if (!parsed.ok) throw new Error(parsed.error.message);
@@ -250,7 +255,10 @@ export default function App() {
             breadcrumbs={{ hidden: !showBreadcrumbs }}
             inspector={{ hidden: true }}
             search={{ hidden: searchHidden }}
-            viewport={{ zoomOnScroll: true }}
+            viewport={{
+              zoomOnScroll: true,
+              fitViewOnInit: fitViewOnInitParam,
+            }}
             toolbar={{
               controls: [
                 "theme",

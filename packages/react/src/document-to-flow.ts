@@ -1,4 +1,4 @@
-import { getVisibleNodeIds } from "@my-mind-node/core";
+import { getVisibleNodeIds, simpleTreeLayout } from "@my-mind-node/core";
 import type { MindMapDocument, MindMapNode, NodeId, MindMapTheme } from "@my-mind-node/core";
 import type { ReactNode } from "react";
 import type { Edge, Node } from "@xyflow/react";
@@ -6,7 +6,7 @@ import type { DropIntent, MindNodeBranchSide } from "./drag-interactions";
 import { getPrimaryNodeLink } from "./link-utils";
 import type { MindNodeData } from "./nodes/MindNode";
 
-interface BranchPalette {
+export interface BranchPalette {
   node: string;
   border: string;
   edge: string;
@@ -50,7 +50,7 @@ const ROOT_PRESENTATION = {
   color: "#111827",
 } as const;
 
-const AUTO_BRANCH_PALETTES: BranchPalette[] = [
+export const AUTO_BRANCH_PALETTES: BranchPalette[] = [
   {
     node: "#80d0dc",
     border: "#70c4d0",
@@ -83,7 +83,7 @@ const AUTO_BRANCH_PALETTES: BranchPalette[] = [
   },
 ];
 
-const AUTO_BRANCH_PALETTES_DARK: BranchPalette[] = [
+export const AUTO_BRANCH_PALETTES_DARK: BranchPalette[] = [
   {
     node: "#13383e",
     border: "#2aa6b8",
@@ -213,14 +213,16 @@ function getBranchSide(
   node: MindMapNode,
   viewRootId: NodeId,
 ): MindNodeBranchSide {
-  const metadataBranchSide = getMetadataString(node, "branchSide");
-  if (
-    metadataBranchSide === "left" ||
-    metadataBranchSide === "right" ||
-    metadataBranchSide === "up" ||
-    metadataBranchSide === "down"
-  ) {
-    return metadataBranchSide;
+  if (viewRootId === document.rootId) {
+    const metadataBranchSide = getMetadataString(node, "branchSide");
+    if (
+      metadataBranchSide === "left" ||
+      metadataBranchSide === "right" ||
+      metadataBranchSide === "up" ||
+      metadataBranchSide === "down"
+    ) {
+      return metadataBranchSide;
+    }
   }
   if (node.id === viewRootId) return getLayoutBranchSide(document.layout.direction);
   const parent = node.parentId ? document.nodes[node.parentId] : undefined;
@@ -257,14 +259,34 @@ export function documentToFlow(
   options: FlowConversionOptions = {},
 ): FlowConversionResult {
   const viewRootId = options.viewRootId ?? document.rootId;
+
+  let effectiveDocument = document;
+  if (viewRootId !== document.rootId) {
+    const localLayout = simpleTreeLayout(document, viewRootId);
+    const nextNodes = { ...document.nodes };
+    for (const [nodeId, pos] of Object.entries(localLayout.positions)) {
+      const orig = nextNodes[nodeId];
+      if (orig) {
+        nextNodes[nodeId] = {
+          ...orig,
+          position: pos,
+        };
+      }
+    }
+    effectiveDocument = {
+      ...document,
+      nodes: nextNodes,
+    };
+  }
+
   const selected = new Set(options.selectedNodeIds ?? []);
   const highlighted = new Set(options.highlightedNodeIds ?? []);
-  const visibleIds = getVisibleNodeIds(document, viewRootId);
+  const visibleIds = getVisibleNodeIds(effectiveDocument, viewRootId);
   const visibleSet = new Set(visibleIds);
-  const branchPaletteByNodeId = getBranchPaletteByNodeId(document, viewRootId, options.theme);
+  const branchPaletteByNodeId = getBranchPaletteByNodeId(effectiveDocument, viewRootId, options.theme);
   const presentationNodes = new Map(
     visibleIds.flatMap((nodeId) => {
-      const node = document.nodes[nodeId];
+      const node = effectiveDocument.nodes[nodeId];
       if (!node) return [];
       return [
         [
@@ -293,10 +315,10 @@ export function documentToFlow(
         highlighted: highlighted.has(node.id),
         flash: options.flashNodeId === node.id,
         readonly: options.readonly,
-        branchSide: getBranchSide(document, node, viewRootId),
+        branchSide: getBranchSide(effectiveDocument, node, viewRootId),
         dropIntent: getNodeDropIntent(options.dropIntent, node.id),
         link: getPrimaryNodeLink(node),
-        collapsedHiddenCount: getCollapsedHiddenCount(document, node),
+        collapsedHiddenCount: getCollapsedHiddenCount(effectiveDocument, node),
         showAddChildControl: options.showAddChildControl !== false && !node.collapsed,
         showCollapseControl: options.showCollapseControl,
         showNodeResizeControls: options.showNodeResizeControls,
@@ -340,7 +362,7 @@ export function documentToFlow(
       });
   });
 
-  const connectionEdges: Edge[] = document.connections
+  const connectionEdges: Edge[] = effectiveDocument.connections
     .filter(
       (connection) => visibleSet.has(connection.sourceId) && visibleSet.has(connection.targetId),
     )
