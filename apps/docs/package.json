@@ -1,7 +1,7 @@
 {
   "name": "@my-mind-node/docs",
   "private": true,
-  "version": "0.1.0-beta.2",
+  "version": "0.1.0-beta.3",
   "type": "module",
   "scripts": {
     "dev": "vitepress dev docs --host 127.0.0.1",
