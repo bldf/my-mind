@@ -1,5 +1,16 @@
 # Changelog
 
+## 2026-06-26 - Branch List UI Polish & Editor Refactor
+
+完成 `14.branch-list-polish-editor-refactor/`，优化分支列表样式、修复单子节点居中布局，并将超大 MindMapEditor.tsx 拆分为可维护模块结构：
+
+- `BranchListPanel` 计数移除 "node(s)" 后缀仅显示数字；标题从单行截断改为 3 行截断（`-webkit-line-clamp: 3`）。
+- `layout.ts` 新增 `computeBoundingBox` 纯函数，`simpleTreeLayout` 在 `shouldSplitRoot=false` 时计算包围盒并偏移使整体居中。
+- 从 `MindMapEditor.tsx`（~1914 行）提取 3 个纯函数模块（`editor-utils.ts`、`viewport-utils.ts`、`drag-geometry.ts`）和 4 个自定义 hooks（`useViewportControl.ts`、`useHistory.ts`、`useDragInteraction.ts`、`useBranchListState.ts`），主文件缩减至 624 行（≤800 行约束）。
+- 解决 hooks 间循环依赖：调用顺序线性化为 `useViewportControl` → `useHistory` → `useBranchListState` → `useDragInteraction`，共享 refs 在父组件创建后传递。
+- 新增 44 个纯函数测试用例（editor-utils 24 + viewport-utils 8 + drag-geometry 12），全部 131 个测试通过。
+- `tasks.md` 共 22 个任务均已标记为 `[x]`。
+
 ## 2026-06-26 - Viewport Interaction Controls Polish v2
 
 完成 `12.viewport-interaction-controls-polish/` 的 v2 追加任务，补齐 viewport 输入与节点标题对齐：

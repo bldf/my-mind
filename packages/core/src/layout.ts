@@ -195,6 +195,44 @@ export function documentToLayoutGraph(document: MindMapDocument): LayoutGraph {
   };
 }
 
+export interface BoundingBox {
+  minX: number;
+  minY: number;
+  maxX: number;
+  maxY: number;
+}
+
+/**
+ * 计算 positions 中所有节点的包围盒。
+ * 节点位置为左上角坐标，需结合 document 中节点的宽高计算完整包围盒。
+ * 复杂度 O(n)。
+ */
+export function computeBoundingBox(
+  positions: Record<string, Point>,
+  document: MindMapDocument,
+): BoundingBox {
+  let minX = Infinity;
+  let minY = Infinity;
+  let maxX = -Infinity;
+  let maxY = -Infinity;
+
+  for (const [id, pos] of Object.entries(positions)) {
+    const node = document.nodes[id];
+    if (!node) continue;
+    const size = estimateNodeSize(node);
+    minX = Math.min(minX, pos.x);
+    minY = Math.min(minY, pos.y);
+    maxX = Math.max(maxX, pos.x + size.width);
+    maxY = Math.max(maxY, pos.y + size.height);
+  }
+
+  if (minX === Infinity) {
+    return { minX: 0, minY: 0, maxX: 0, maxY: 0 };
+  }
+
+  return { minX, minY, maxX, maxY };
+}
+
 export function applyLayoutResult(document: MindMapDocument, layout: LayoutResult): MindMapDocument {
   const next = cloneDocument(document);
   for (const [nodeId, position] of Object.entries(layout.positions)) {
@@ -231,8 +269,9 @@ export function simpleTreeLayout(document: MindMapDocument, rootId: NodeId = doc
     y: Math.round(-rootSize.height / 2),
   };
 
+  const shouldSplitRoot = root.children.length > 1;
+
   if (!root.collapsed) {
-    const shouldSplitRoot = root.children.length > 1;
     const pivot = shouldSplitRoot ? Math.ceil(root.children.length / 2) : root.children.length;
     const firstSide: -1 | 1 = shouldSplitRoot ? (direction === "left" ? 1 : -1) : direction === "left" ? -1 : 1;
     const secondSide: -1 | 1 = firstSide === -1 ? 1 : -1;
@@ -251,6 +290,18 @@ export function simpleTreeLayout(document: MindMapDocument, rootId: NodeId = doc
         placeLayoutBox(child, childCenterX, childCenterY, compactGapX, compactGapY, positions);
         cursorY += child.subtreeHeight + compactGapY;
       }
+    }
+  }
+
+  // 当根节点不分裂（单子节点或无子节点）时，计算包围盒并将整体居中
+  if (!shouldSplitRoot && Object.keys(positions).length > 0) {
+    const bounds = computeBoundingBox(positions, document);
+    const offsetX = -(bounds.minX + bounds.maxX) / 2;
+    const offsetY = -(bounds.minY + bounds.maxY) / 2;
+    for (const id of Object.keys(positions)) {
+      const p = positions[id]!;
+      p.x += offsetX;
+      p.y += offsetY;
     }
   }
 

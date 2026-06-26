@@ -108,9 +108,7 @@ export function BranchListPanel({
                 style={{ backgroundColor: swatchColor }}
               />
               <span className="mmn-branch-list-item__title">{node.title}</span>
-              <span className="mmn-branch-list-item__count">
-                {totalNodes} {totalNodes === 1 ? "node" : "nodes"}
-              </span>
+              <span className="mmn-branch-list-item__count">{totalNodes}</span>
             </button>
           );
         })}

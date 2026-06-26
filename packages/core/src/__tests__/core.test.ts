@@ -1,8 +1,9 @@
 import { describe, expect, it } from "vitest";
 import {
+  computeBoundingBox,
   createEmptyDocument,
-  documentToLayoutGraph,
   dispatchCommand,
+  documentToLayoutGraph,
   estimateLayoutNodeHeight,
   estimateLayoutTitleWidth,
   exportIndentedText,
@@ -119,5 +120,50 @@ describe("@my-mind-node/core", () => {
 
     const height = estimateLayoutNodeHeight(node);
     expect(height).toBe(46);
+  });
+
+  it("centers single-child subtree when root has only one child", () => {
+    let document = createEmptyDocument({ rootTitle: "Root" });
+
+    // 添加唯一子节点
+    const result = dispatchCommand(document, { type: "node.create", parentId: document.rootId, title: "Only Child" });
+    if (!result.ok) throw new Error("command failed");
+    document = result.document;
+
+    // 为子节点添加多个孙节点使子树偏向一侧
+    const childId = document.nodes[document.rootId]!.children[0]!;
+    for (const title of ["Grand 1", "Grand 2", "Grand 3"]) {
+      const r = dispatchCommand(document, { type: "node.create", parentId: childId, title });
+      if (!r.ok) throw new Error("command failed");
+      document = r.document;
+    }
+
+    const layout = simpleTreeLayout(document);
+    const bounds = computeBoundingBox(layout.positions, document);
+
+    // 包围盒中心应在原点 (0, 0) 附近
+    const centerX = (bounds.minX + bounds.maxX) / 2;
+    const centerY = (bounds.minY + bounds.maxY) / 2;
+    expect(Math.abs(centerX)).toBeLessThan(5);
+    expect(Math.abs(centerY)).toBeLessThan(5);
+  });
+
+  it("does not center (keeps split) when root has multiple children", () => {
+    let document = createEmptyDocument({ rootTitle: "Root" });
+    for (const title of ["Left", "Right"]) {
+      const result = dispatchCommand(document, { type: "node.create", parentId: document.rootId, title });
+      if (!result.ok) throw new Error("command failed");
+      document = result.document;
+    }
+
+    const layout = simpleTreeLayout(document);
+    const root = layout.positions[document.rootId]!;
+    const children = document.nodes[document.rootId]!.children;
+
+    // 多子节点时保持分裂，根节点在原点
+    expect(Math.abs(root.x)).toBeLessThan(100);
+    // 子节点分列左右两侧
+    expect(layout.positions[children[0]!]!.x).toBeLessThan(root.x);
+    expect(layout.positions[children[1]!]!.x).toBeGreaterThan(root.x);
   });
 });

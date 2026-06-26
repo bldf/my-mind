@@ -1153,10 +1153,12 @@
 .mmn-branch-list-item__title {
   flex: 1;
   overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  display: -webkit-box;
+  -webkit-line-clamp: 3;
+  -webkit-box-orient: vertical;
   font-size: 13px;
   margin-right: 8px;
+  word-break: break-word;
 }
 
 .mmn-branch-list-item__count {
