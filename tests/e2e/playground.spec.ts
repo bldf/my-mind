@@ -1060,6 +1060,34 @@ test.describe("Branch List Focus Layout", () => {
     await expectVisibleNodesCenteredInCanvas(page, 12);
   });
 
+  test("toolbar fit view recenters the selected branch subtree", async ({ page, isMobile }) => {
+    test.skip(isMobile, "Split layout side panel is hidden by default on mobile viewports.");
+
+    await page.goto("/?fitViewOnInit=");
+    await page.locator(".mmn-branch-toggle-btn").click();
+    await expect(page.locator(".mmn-branch-list-panel")).toBeVisible();
+
+    const secondItem = page.locator(".mmn-branch-list-item").nth(1);
+    await secondItem.click();
+    await expect(secondItem).toHaveClass(/mmn-branch-list-item--selected/);
+    await expectVisibleNodesCenteredInCanvas(page, 12);
+
+    const canvas = await page.locator(".react-flow").boundingBox();
+    if (!canvas) throw new Error("React Flow canvas is not visible");
+    const beforePan = await getViewportState(page);
+    await page.mouse.move(canvas.x + canvas.width / 2, canvas.y + canvas.height / 2);
+    await page.mouse.wheel(420, 260);
+    await expect
+      .poll(async () => {
+        const viewport = await getViewportState(page);
+        return Math.abs(viewport.x - beforePan.x) + Math.abs(viewport.y - beforePan.y);
+      })
+      .toBeGreaterThan(80);
+
+    await page.getByRole("button", { name: "Fit view" }).click();
+    await expectVisibleNodesCenteredInCanvas(page, 12);
+  });
+
   test("fullscreen branch switching recenters the selected subtree", async ({ page, isMobile }) => {
     test.skip(isMobile, "Split layout side panel is hidden by default on mobile viewports.");
 

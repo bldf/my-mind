@@ -151,15 +151,9 @@ export function useViewportControl({
               containerEl?.querySelector<HTMLElement>(".react-flow") ?? containerEl;
             if (flowElement) {
               const rect = flowElement.getBoundingClientRect();
-              const targetNodeId = waitForNodeId;
-              const rootNode = nodes.find((node) => node.id === String(targetNodeId));
               let centerX = 0;
               let centerY = 0;
-              if (rootNode) {
-                const bounds = flowRef.current.getNodesBounds([rootNode]);
-                centerX = bounds.x + bounds.width / 2;
-                centerY = bounds.y + bounds.height / 2;
-              } else if (nodes.length > 0) {
+              if (nodes.length > 0) {
                 const bounds = flowRef.current.getNodesBounds(nodes);
                 centerX = bounds.x + bounds.width / 2;
                 centerY = bounds.y + bounds.height / 2;

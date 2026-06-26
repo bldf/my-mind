@@ -232,7 +232,7 @@ describe("MindMapEditor regression coverage", () => {
     await waitFor(() => expect(getFlowNode("first").position).toEqual({ x: 1000, y: 0 }));
   });
 
-  it("keeps deferred one-to-one viewport updates centered on the view root", async () => {
+  it("keeps deferred one-to-one viewport updates centered on visible nodes", async () => {
     render(<MindMapEditor value={createPositionedDocument()} viewport={{ fitViewOnInit: false }} />);
     const rootTitle = await screen.findByLabelText("Title for Root");
     fakeFlowState.setViewport.mockClear();
@@ -247,6 +247,6 @@ describe("MindMapEditor regression coverage", () => {
     });
 
     await waitFor(() => expect(fakeFlowState.setViewport).toHaveBeenCalled());
-    expect(fakeFlowState.setViewport).toHaveBeenLastCalledWith({ x: 350, y: 275, zoom: 1 });
+    expect(fakeFlowState.setViewport).toHaveBeenLastCalledWith({ x: -650, y: 275, zoom: 1 });
   });
 });
