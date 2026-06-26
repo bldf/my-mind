@@ -941,6 +941,14 @@
   overflow: hidden;
 }
 
+.mmn-branch-layout__canvas .react-flow {
+  transition: opacity 120ms ease;
+}
+
+.mmn-editor--branch-switching .mmn-branch-layout__canvas .react-flow {
+  opacity: 0;
+}
+
 .mmn-editor--sidebar-collapsed .mmn-branch-layout__canvas {
   grid-column: 1 / -1;
 }

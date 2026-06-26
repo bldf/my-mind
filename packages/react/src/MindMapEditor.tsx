@@ -141,7 +141,19 @@ type ViewportUpdateAction = "fit" | "fit1to1" | "center";
 interface ViewportUpdateOptions {
   waitForNodeId?: NodeId;
   maxWaitFrames?: number;
+  shouldRun?: () => boolean;
+  onSettled?: () => void;
 }
+
+type ScheduledAnimationFrame = {
+  ownerWindow: Window;
+  frameId: number;
+};
+
+type ScheduledTimeout = {
+  ownerWindow: Window;
+  timeoutId: number;
+};
 
 function clamp(value: number, min: number, max: number): number {
   return Math.min(max, Math.max(min, value));
@@ -412,10 +424,42 @@ function EditorCanvas(props: MindMapEditorProps) {
   const [sidebarPreviewOpen, setSidebarPreviewOpen] = useState(false);
   const [sidebarPinned, setSidebarPinned] = useState(true);
   const [sidebarWidth, setSidebarWidth] = useState(branchListLayout?.defaultSidebarWidth ?? 280);
+  const [branchSwitchPending, setBranchSwitchPending] = useState(false);
 
   // Restore viewRootId on exit
   const previousViewRootIdRef = useRef<NodeId>(document.rootId);
   const pendingBranchViewportUpdateRef = useRef(false);
+  const pendingViewportAction = useRef<ViewportUpdateAction | null>(null);
+  const branchSwitchTokenRef = useRef(0);
+  const branchSwitchFrameRef = useRef<ScheduledAnimationFrame | null>(null);
+  const branchSwitchTimeoutRef = useRef<ScheduledTimeout | null>(null);
+  const splitModeRef = useRef(splitMode);
+  splitModeRef.current = splitMode;
+
+  const clearBranchSwitchFrame = useCallback(() => {
+    const frame = branchSwitchFrameRef.current;
+    if (frame) {
+      frame.ownerWindow.cancelAnimationFrame(frame.frameId);
+      branchSwitchFrameRef.current = null;
+    }
+  }, []);
+
+  const clearBranchSwitchTimeout = useCallback(() => {
+    const timeout = branchSwitchTimeoutRef.current;
+    if (timeout) {
+      timeout.ownerWindow.clearTimeout(timeout.timeoutId);
+      branchSwitchTimeoutRef.current = null;
+    }
+  }, []);
+
+  const cancelBranchSwitch = useCallback(() => {
+    branchSwitchTokenRef.current += 1;
+    pendingBranchViewportUpdateRef.current = false;
+    pendingViewportAction.current = null;
+    clearBranchSwitchFrame();
+    clearBranchSwitchTimeout();
+    setBranchSwitchPending(false);
+  }, [clearBranchSwitchFrame, clearBranchSwitchTimeout]);
 
   const effectiveViewRootId = useMemo(() => {
     if (document.nodes[viewRootId]) return viewRootId;
@@ -426,13 +470,15 @@ function EditorCanvas(props: MindMapEditorProps) {
   }, [document.nodes, viewRootId, splitMode, selectedBranchId, document.rootId]);
 
   const exitSplitMode = useCallback(() => {
+    cancelBranchSwitch();
+    splitModeRef.current = "normal";
     setSplitMode("normal");
     const prevId = previousViewRootIdRef.current;
     const nextRootId = document.nodes[prevId] ? prevId : document.rootId;
     setViewRootId(nextRootId);
     onViewRootChange?.(nextRootId);
     setSidebarPreviewOpen(false);
-  }, [document, onViewRootChange]);
+  }, [cancelBranchSwitch, document, onViewRootChange]);
 
   const enterSplitMode = useCallback(
     (initialBranchId?: NodeId) => {
@@ -506,7 +552,6 @@ function EditorCanvas(props: MindMapEditorProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const lastAutoFitKey = useRef("");
   const fitViewFrame = useRef<number | null>(null);
-  const pendingViewportAction = useRef<ViewportUpdateAction | null>(null);
   const nodeResizeActive = useRef(false);
   const nodesInitializedRef = useRef(false);
   const renderedNodeCountRef = useRef(0);
@@ -569,10 +614,14 @@ function EditorCanvas(props: MindMapEditorProps) {
 
       const waitForNodeId = options.waitForNodeId;
       const maxWaitFrames = options.maxWaitFrames ?? DEFAULT_VIEWPORT_UPDATE_WAIT_FRAMES;
+      const shouldRun = options.shouldRun;
+      const onSettled = options.onSettled;
 
       const scheduleFrame = (attempt: number) => {
         fitViewFrame.current = requestAnimationFrame(() => {
           fitViewFrame.current = null;
+          if (shouldRun && !shouldRun()) return;
+
           const container = containerRef.current;
           if (
             dragSession.current ||
@@ -605,6 +654,7 @@ function EditorCanvas(props: MindMapEditorProps) {
             scheduleFrame(attempt + 1);
             return;
           }
+          if (shouldRun && !shouldRun()) return;
 
           pendingViewportAction.current = null;
           if (action === "fit") {
@@ -637,6 +687,7 @@ function EditorCanvas(props: MindMapEditorProps) {
           } else {
             centerViewAtCurrentZoom();
           }
+          onSettled?.();
         });
       };
 
@@ -670,27 +721,72 @@ function EditorCanvas(props: MindMapEditorProps) {
 
   const handleSelectBranch = useCallback(
     (branchId: NodeId) => {
+      const switchToken = branchSwitchTokenRef.current + 1;
+      branchSwitchTokenRef.current = switchToken;
+      clearBranchSwitchFrame();
+      clearBranchSwitchTimeout();
+      setBranchSwitchPending(true);
       pendingBranchViewportUpdateRef.current = true;
       setSelectedBranchId(branchId);
       setViewRootId(branchId);
       onViewRootChange?.(branchId);
-      const viewportOptions = {
-        waitForNodeId: branchId,
-        maxWaitFrames: DEFAULT_VIEWPORT_UPDATE_WAIT_FRAMES * 4,
-      };
+      // Fallback: schedule viewport update via double-rAF to ensure React Flow
+      // has committed new nodes and updated `measured` dimensions.
+      // The useEffect path may fire too early (before measured is set).
       const ownerWindow = containerRef.current?.ownerDocument.defaultView ?? window;
-      const scheduleBranchViewportUpdate = () => {
-        if (!containerRef.current) return;
+      const isCurrentBranchSwitch = () =>
+        branchSwitchTokenRef.current === switchToken &&
+        splitModeRef.current === "split" &&
+        containerRef.current !== null;
+      const scheduleBranchViewport = () => {
+        branchSwitchFrameRef.current = null;
+        if (!isCurrentBranchSwitch()) return;
+
+        pendingBranchViewportUpdateRef.current = false;
+        const viewportOptions = {
+          waitForNodeId: branchId,
+          maxWaitFrames: DEFAULT_VIEWPORT_UPDATE_WAIT_FRAMES * 4,
+          shouldRun: isCurrentBranchSwitch,
+          onSettled: () => {
+            if (branchSwitchTokenRef.current === switchToken) {
+              clearBranchSwitchTimeout();
+              setBranchSwitchPending(false);
+            }
+          },
+        };
         if (props.viewport?.fitViewOnInit === true) {
           scheduleFitView(viewportOptions);
         } else {
           scheduleFit1to1View(viewportOptions);
         }
       };
-      ownerWindow.setTimeout(scheduleBranchViewportUpdate, 0);
-      ownerWindow.setTimeout(scheduleBranchViewportUpdate, 80);
+      const firstFrameId = ownerWindow.requestAnimationFrame(() => {
+        if (branchSwitchFrameRef.current?.frameId === firstFrameId) {
+          branchSwitchFrameRef.current = null;
+        }
+        if (!isCurrentBranchSwitch()) return;
+
+        const secondFrameId = ownerWindow.requestAnimationFrame(scheduleBranchViewport);
+        branchSwitchFrameRef.current = { ownerWindow, frameId: secondFrameId };
+      });
+      branchSwitchFrameRef.current = { ownerWindow, frameId: firstFrameId };
+      const timeoutId = ownerWindow.setTimeout(() => {
+        if (branchSwitchTokenRef.current === switchToken) {
+          branchSwitchTimeoutRef.current = null;
+          pendingBranchViewportUpdateRef.current = false;
+          setBranchSwitchPending(false);
+        }
+      }, 600);
+      branchSwitchTimeoutRef.current = { ownerWindow, timeoutId };
     },
-    [onViewRootChange, props.viewport?.fitViewOnInit, scheduleFit1to1View, scheduleFitView],
+    [
+      clearBranchSwitchFrame,
+      clearBranchSwitchTimeout,
+      onViewRootChange,
+      props.viewport?.fitViewOnInit,
+      scheduleFit1to1View,
+      scheduleFitView,
+    ],
   );
 
   const syncHistoryAvailability = useCallback(() => {
@@ -1620,6 +1716,9 @@ function EditorCanvas(props: MindMapEditorProps) {
     )
       return;
     if (lastAutoFitKey.current === autoFitKey) return;
+    // Branch switching in split mode handles its own viewport update via
+    // double-rAF in handleSelectBranch to ensure measured dimensions are ready.
+    if (pendingBranchViewportUpdateRef.current) return;
     lastAutoFitKey.current = autoFitKey;
 
     const viewportOptions = { waitForNodeId: effectiveViewRootId };
@@ -1643,20 +1742,13 @@ function EditorCanvas(props: MindMapEditorProps) {
     if (splitMode !== "split" || renderedNodes.length === 0 || !renderedNodesContainEffectiveRoot)
       return;
 
+    // Mark as handled so autoFitKey useEffect skips (avoids duplicate fitView).
+    // The actual viewport update is performed by the double-rAF in handleSelectBranch.
     pendingBranchViewportUpdateRef.current = false;
-    const viewportOptions = { waitForNodeId: effectiveViewRootId };
-    if (props.viewport?.fitViewOnInit === true) {
-      scheduleFitView(viewportOptions);
-    } else {
-      scheduleFit1to1View(viewportOptions);
-    }
   }, [
     effectiveViewRootId,
-    props.viewport?.fitViewOnInit,
     renderedNodes.length,
     renderedNodesContainEffectiveRoot,
-    scheduleFit1to1View,
-    scheduleFitView,
     splitMode,
   ]);
 
@@ -1718,9 +1810,11 @@ function EditorCanvas(props: MindMapEditorProps) {
     return () => {
       clearFlashTimer();
       clearFitViewFrame();
+      clearBranchSwitchFrame();
+      clearBranchSwitchTimeout();
       pendingViewportAction.current = null;
     };
-  }, [clearFitViewFrame, clearFlashTimer]);
+  }, [clearBranchSwitchFrame, clearBranchSwitchTimeout, clearFitViewFrame, clearFlashTimer]);
 
   const handleResizePointerDown = useCallback(
     (event: React.PointerEvent<HTMLDivElement>) => {
@@ -1949,6 +2043,7 @@ function EditorCanvas(props: MindMapEditorProps) {
         "mmn-editor",
         props.className,
         isSplitMode && "mmn-editor--split-mode",
+        branchSwitchPending && "mmn-editor--branch-switching",
         sidebarCollapsed && "mmn-editor--sidebar-collapsed",
         sidebarPreviewOpen && "mmn-editor--sidebar-preview-open",
         sidebarPinned && "mmn-editor--sidebar-pinned",
