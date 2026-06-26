@@ -356,11 +356,6 @@ function renderDemoNode(node: MindMapNode) {
   if (node.parentId === null) {
     return (
       <div className="readonly-demo-logo">
-        <div className="readonly-demo-logo__brand">
-          <span className="readonly-demo-logo__mark">灯</span>
-          <span className="readonly-demo-logo__name">壹程一灯</span>
-        </div>
-        <span className="readonly-demo-logo__url">WWW.YIDENGFE.COM</span>
         <strong>AI全栈工程师-开篇</strong>
       </div>
     );
