@@ -5,6 +5,7 @@
 | 日期 | 版本 | 说明 |
 | --- | --- | --- |
 | 2026-06-25 | v1 | 初始技术设计 |
+| 2026-06-26 | v2 | 补充滚轮平移、双指缩放与节点标题动态对齐设计 |
 
 ## 项目架构
 
@@ -14,15 +15,16 @@
 
 ## 功能模块设计
 
-### 模块 1: 视口滚轮缩放
+### 模块 1: 视口滚轮与手势缩放
 
 在 `packages/react/src/types.ts` 扩展 `ViewportConfig`，保留 `zoomOnScroll` 现有语义，并新增可选参数:
 
 - `wheelZoomSensitivity?: number`
 - `wheelZoomMaxStep?: number`
 - `fitViewOnResize?: boolean`
+- `zoomOnPinch?: boolean`
 
-`MindMapEditor` 中不直接依赖 React Flow 默认滚轮缩放完成线性体验。启用 `viewport.zoomOnScroll` 时，在编辑器容器或 React Flow pane 上处理 `wheel` 事件，按 `deltaY` 计算目标 zoom:
+`MindMapEditor` 中不直接依赖 React Flow 默认滚轮缩放完成线性体验。启用 `viewport.zoomOnScroll` 且事件被判定为缩放手势时，在编辑器容器或 React Flow pane 上处理 `wheel` / pinch-like wheel 事件，按 `deltaY` 计算目标 zoom:
 
 ```text
 step = clamp(-deltaY * sensitivity, -maxStep, maxStep)
@@ -31,11 +33,57 @@ nextZoom = clamp(currentZoom * (1 + step), minZoom, maxZoom)
 
 缩放锚点使用事件的 `clientX/clientY`。根据当前 viewport 与容器 bounds 计算缩放前鼠标所在 flow 坐标，再反推 `x/y/zoom`，调用 `flow.setViewport`。滚轮事件只更新 viewport，不提交文档、不记录 history。
 
+v2 需要先区分普通滚动和平移手势、缩放手势:
+
+- 普通 `wheel` / 触控板滚动进入模块 1A 的平移逻辑，不再被缩放逻辑吞掉。
+- 浏览器把触控板 pinch 上报成 `ctrlKey` / `metaKey` wheel 时，继续走本模块的指针锚点缩放逻辑。
+- 触屏双指 pinch 由 React Flow 的 `zoomOnPinch` 支持，默认启用；宿主可通过 `viewport.zoomOnPinch === false` 关闭。
+- 需要保留旧版“普通滚轮直接缩放”的宿主，可显式设置 `viewport.panOnScroll === false` 且 `viewport.zoomOnScroll === true`。
+
 **涉及层及关键设计:**
 
 - React: `MindMapEditor` 增加 wheel handler、viewport clamp 常量和可配置参数。
 - CSS/UX: 缩放不添加额外视觉组件；继续使用顶部 zoom 按钮。
-- 测试: E2E 断言小幅 wheel 只产生小幅 transform 变化，并保持鼠标锚点附近节点稳定。
+- 测试: E2E 断言小幅 pinch-like wheel 或兼容模式 wheel 只产生小幅 transform 变化，并保持鼠标锚点附近节点稳定。
+
+### 模块 1A: 滚轮与触控板平移
+
+在 `ViewportConfig` 新增可选参数:
+
+- `panOnScroll?: boolean`
+- `wheelPanSensitivity?: number`
+
+`MindMapEditor` 在 `.react-flow` 外层继续使用 capture phase 的原生 `wheel` listener，但 handler 需要先判断事件目标和手势类型:
+
+1. 如果事件发生在 textarea、input、select、toolbar、theme panel、search panel、inspector 等可滚动或可编辑 UI 内，不接管。
+2. 如果事件是 pinch-like zoom gesture，交给模块 1 的缩放路径。
+3. 如果 `viewport.panOnScroll !== false`，按 `deltaX` / `deltaY` 更新当前 viewport 的 `x` / `y`，并 `preventDefault()` 防止页面滚动。
+4. 如果宿主关闭 `panOnScroll` 且启用 `zoomOnScroll`，保留 v1 普通 wheel 缩放行为。
+
+平移只调用 `flow.setViewport({ x, y, zoom: currentZoom })`，不得触发 `onChange`、history、layout 或 selection。滚动 delta 需要通过 `normalizeWheelDelta` 同类 helper 统一 `deltaMode`，并用 `wheelPanSensitivity` 做灵敏度控制，避免高频触控板一次事件移动过远。
+
+**涉及层及关键设计:**
+
+- React: `MindMapEditor` 拆分 wheel 分类、scroll pan 和 zoom helper，避免平移与缩放互相抢事件。
+- Viewer: `MindMapViewer` 继承同一 viewport 行为。
+- Playground: 当前 `viewport={{ zoomOnScroll: true }}` 需要按新默认同时支持普通滚轮平移和 pinch zoom。
+- 测试: E2E 覆盖普通 `page.mouse.wheel()` 后 `x/y` 改变且 `zoom` 不变。
+
+### 模块 1B: 双指放大缩小
+
+当前 `ReactFlow` 渲染中 `zoomOnPinch={false}`，导致触屏或部分触控板双指缩放不可用。v2 改为:
+
+```tsx
+zoomOnPinch={props.viewport?.zoomOnPinch ?? true}
+```
+
+对 trackpad pinch 触发的 `ctrlKey` / `metaKey` wheel，继续复用模块 1 自定义缩放，以保证缩放锚点、`minZoom` / `maxZoom`、`wheelZoomSensitivity` 与 v1 行为一致。对触屏 pinch，则让 React Flow 处理 pointer/touch 级别缩放，避免重新实现多指手势状态机。
+
+**涉及层及关键设计:**
+
+- React Flow: 打开 `zoomOnPinch`，同时保持 `zoomOnScroll={false}`，防止默认普通 wheel 缩放与自定义平移冲突。
+- React: wheel handler 只拦截 pinch-like wheel；普通 wheel 平移。
+- 测试: 单元测试覆盖 prop 传递或配置关闭；浏览器测试覆盖 ctrl-wheel/pinch-like wheel 改变 zoom。
 
 ### 模块 2: 全屏 toggle 与状态同步
 
@@ -184,6 +232,39 @@ controls = rawControls.filter(control => !(control === "search" && props.search?
 - Viewer: `MindMapViewer` 默认 controls 也经过同一过滤逻辑。
 - 测试: `search={{ hidden: true }}` 时 toolbar 无 `Search` 按钮；即使 props.controls 显式包含 `search` 也被过滤。
 
+### 模块 9: 节点标题动态对齐
+
+当前 `.mmn-node__title` 统一 `text-align: center`，在标题包含 `\n` 或被宽度限制自动换成多行时可读性较差。v2 在 `MindNode` 内根据实际视觉行数加 class:
+
+```ts
+const titleRows = getTextareaRows(draftOrTitle, nodeWidth);
+const titleIsMultiline = titleRows > 1;
+```
+
+渲染默认节点标题时:
+
+- editable textarea 使用 `draft` 计算行数，编辑过程中实时切换。
+- readonly 标题和 link 标题使用 `node.title` 计算行数。
+- `titleIsMultiline` 为 true 时追加 `mmn-node__title--multiline`。
+- 单行时不追加该 class，继续使用居中。
+- 自定义 `renderNode` 由宿主完全控制，不注入对齐样式。
+
+CSS 中新增:
+
+```css
+.mmn-node__title--multiline {
+  text-align: left;
+}
+```
+
+如未来需要按真实 DOM 行盒测量，可以在 textarea / button 渲染后读取 `scrollHeight` 与 `line-height`，但本次优先复用现有 `getTextareaRows` 和 layout 估算，保持 SSR-safe 与测试稳定。
+
+**涉及层及关键设计:**
+
+- React: `MindNode` 统一为 editable、readonly、link 标题追加动态 class。
+- CSS: 保持 `.mmn-node__title` 默认居中，仅多行覆盖左对齐。
+- 测试: React smoke 覆盖单行、显式换行、多行自动换行三类 class；E2E 覆盖 playground 中长标题换行后 computed `text-align` 为 `left`。
+
 ## 接口契约
 
 ### React Props
@@ -191,11 +272,14 @@ controls = rawControls.filter(control => !(control === "search" && props.search?
 ```ts
 export interface ViewportConfig {
   zoomOnScroll?: boolean;
+  zoomOnPinch?: boolean;
   panOnDrag?: boolean;
+  panOnScroll?: boolean;
   fitViewOnInit?: boolean;
   fitViewOnResize?: boolean;
   wheelZoomSensitivity?: number;
   wheelZoomMaxStep?: number;
+  wheelPanSensitivity?: number;
 }
 
 export interface MiniMapConfig {
@@ -220,6 +304,8 @@ export interface MindMapEditorProps {
 - `initialDocumentRef`
 - `dragSession.visualNodeIds`
 - `ResizeObserver` 最近尺寸缓存
+- wheel 事件分类与滚轮平移临时 viewport 状态
+- 节点标题是否多行的运行时 class，不写入 `MindMapDocument`
 
 ## 安全考虑
 
@@ -233,7 +319,10 @@ export interface MindMapEditorProps {
 | 决策 | 选项 | 理由 |
 | --- | --- | --- |
 | MiniMap 默认隐藏 | 新增 `minimap.visible` 显式启用 | 符合用户反馈，且比 `hidden` 默认 true 更直观 |
-| 滚轮缩放 | 自定义 wheel handler + `flow.setViewport` | 可控制线性比例、单帧步进和鼠标锚点，避免默认行为过猛 |
+| 缩放手势 | 自定义 wheel handler + `flow.setViewport`，触屏 pinch 交给 React Flow | 可控制线性比例、单帧步进和手势锚点，避免默认行为过猛 |
 | reset 初始状态 | 记录 editor 挂载时文档快照 | 与“还原到初始状态”语义一致，不引入新的持久化字段 |
 | 子树拖拽 | 本地视觉同步后代，提交仍只移动顶层节点 | 保持拖拽直觉，同时避免破坏树结构和 history 语义 |
 | 搜索隐藏 | toolbar controls 规范化过滤 | 宿主配置和 UI 表现一致，并兼容显式 controls 包含 search 的情况 |
+| 普通滚轮 | 默认平移 viewport | 符合本次反馈中“滚动也可以调整画布位置”的直觉，且不写文档 history |
+| 双指缩放 | `zoomOnPinch` + pinch-like wheel 走缩放路径 | 同时覆盖触屏 pinch 和触控板 pinch，避免普通 wheel 平移与缩放冲突 |
+| 多行标题对齐 | 单行默认居中，多行追加 class 左对齐 | 满足短标题视觉居中和长标题阅读性两种场景 |

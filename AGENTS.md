@@ -41,7 +41,7 @@ Codex/Claude automation workspace and implementation monorepo for My Mind Node.
 │   └── custom-node-example/  # 自定义节点渲染示例
 ├── tests/                    # fixtures、bench、a11y、Playwright E2E
 ├── scripts/                  # fixture、bench、bundle budget 脚本
-├── .codex/
+├── .agents/
 │   ├── agents/               # Codex subagent 定义
 │   ├── prompts/              # Codex slash prompts 与 my-ai 节点
 │   ├── rules/                # Codex 项目规则
@@ -54,7 +54,7 @@ Codex/Claude automation workspace and implementation monorepo for My Mind Node.
 
 Codex 执行任务前应读取：
 
-- `.codex/rules/coding-style.md`
-- `.codex/rules/testing.md`
-- `.codex/rules/security.md`
-- `.codex/rules/git-workflow.md`
+- `.agents/rules/coding-style.md`
+- `.agents/rules/testing.md`
+- `.agents/rules/security.md`
+- `.agents/rules/git-workflow.md`

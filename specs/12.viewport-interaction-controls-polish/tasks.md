@@ -5,6 +5,7 @@
 | 日期 | 版本 | 说明 |
 | --- | --- | --- |
 | 2026-06-25 | v1 | 初始任务 |
+| 2026-06-26 | v2 | 新增滚轮平移、双指缩放和节点标题动态对齐任务 |
 
 ## 项目信息
 
@@ -40,12 +41,21 @@
 - [x] T-012: 补充 Playwright E2E，覆盖平滑滚轮缩放、全屏进入退出、父节点拖拽子树跟随、容器 resize 居中和搜索按钮隐藏 ~1h
 - [x] T-013: 运行 `pnpm typecheck`、`pnpm test`、`pnpm e2e`、`git diff --check` 并修复回归 ~1h
 
+### 功能 4: v2 视口输入与节点文本对齐
+
+- [ ] T-014: 扩展 `ViewportConfig` 与 `MindMapEditor` wheel handler，区分普通滚轮/触控板滚动与 pinch-like zoom，并实现普通滚轮平移 viewport 且不写入 history ~1h
+- [ ] T-015: 启用可配置 `zoomOnPinch`，让触屏双指 pinch 和触控板 pinch-like wheel 可以按手势中心缩放，同时保留 `minZoom` / `maxZoom` 与缩放灵敏度限制 ~45min
+- [ ] T-016: 在 `MindNode` 为 editable、readonly、link 标题按视觉行数追加多行 class，CSS 实现单行居中、多行左对齐，自定义 `renderNode` 不受影响 ~45min
+- [ ] T-017: 补充 React 单元测试与 Playwright E2E，覆盖滚轮平移、pinch/ctrl-wheel 缩放、单行标题居中、多行标题左对齐，并运行 `pnpm typecheck`、`pnpm test`、`pnpm e2e`、`git diff --check` ~1h
+
 ## 依赖关系
 
 - T-002 依赖 T-001 的 viewport 工具常量与交互 guard。
 - T-005 依赖 T-004 的 toolbar 控件和禁用态能力。
 - T-012 依赖 T-001、T-002、T-003、T-007、T-008 完成后再编写稳定浏览器断言。
 - T-013 依赖所有实现与测试任务完成。
+- T-015 依赖 T-014 的 wheel 事件分类，避免普通滚轮平移和 pinch 缩放互相吞事件。
+- T-017 依赖 T-014、T-015、T-016 完成后再补充端到端验收。
 
 ## 风险点
 
@@ -53,3 +63,5 @@
 - ResizeObserver 可能在全屏、侧栏动画或初始布局时连续触发；需要 rAF 合并并避免编辑中抢夺焦点。
 - 子树拖拽的临时位置同步可能与 React Flow 自身 node changes 竞争；需要用 `dragSession` 明确区分视觉节点和最终提交节点。
 - 受控模式 reset 只能通过 `onChange` 请求宿主恢复；如果宿主忽略回调，组件不能强制改变外部 `value`。
+- v2 将普通滚轮用于平移、pinch-like wheel 用于缩放，可能影响依赖旧版普通 wheel 缩放的宿主；需要通过 `panOnScroll: false` 或等价配置保留旧行为。
+- 节点标题自动换行行数来自 layout 估算，字体、缩放和宽度覆盖可能导致估算与真实 DOM 行数存在边界差异；需要用单元测试和真实浏览器 computed style 同时覆盖。
