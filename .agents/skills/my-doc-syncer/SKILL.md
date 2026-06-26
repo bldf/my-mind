@@ -9,7 +9,7 @@ description: 文档同步 Skill，开发完成后自动更新 README、.antigrav
 
 ## 触发条件
 
-由 `/my:ai` 在所有 feature 开发完成后自动调用。
+由 `/my-ai-auto-dev` 在所有 feature 开发完成后自动调用。
 
 ## 输入
 

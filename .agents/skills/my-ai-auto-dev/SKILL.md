@@ -1,6 +1,6 @@
 ---
 name: my-ai-auto-dev
-description: Execute numbered development specs automatically across one or more code projects. Use when the user asks to run a /my:ai-style workflow, implement features from requirements.md/design.md/tasks.md, resume unfinished spec tasks, coordinate review and QA after each task, or finish all specs end to end.
+description: Execute numbered development specs automatically across one or more code projects. Use when the user asks to run a /my-ai-auto-dev-style workflow, implement features from requirements.md/design.md/tasks.md, resume unfinished spec tasks, coordinate review and QA after each task, or finish all specs end to end.
 ---
 
 # My AI Auto Dev - 自动开发

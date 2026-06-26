@@ -253,7 +253,7 @@ description: Generate or update development specs from requirement documents, pr
 - 按功能拆，AI 执行时读 design.md 自动识别涉及哪些层
 - 原子性，可独立完成和验证
 - 预估完成时间（5min / 15min / 30min / 1h）
-- **粒度控制**：每个子 specs（feature 目录）不宜过大，单个 tasks.md 控制在 **10-15 个任务以内**。如果需求过大，应在 Step 6 之前拆成多个独立的 feature 目录（如 `2.user-auth-login`、`3.user-auth-register`），每个 feature 有自己的 requirements/design/tasks 三件套。这样 my:ai 执行时上下文可控，不会因为 specs 太大导致丢失关键信息。
+- **粒度控制**：每个子 specs（feature 目录）不宜过大，单个 tasks.md 控制在 **10-15 个任务以内**。如果需求过大，应在 Step 6 之前拆成多个独立的 feature 目录（如 `2.user-auth-login`、`3.user-auth-register`），每个 feature 有自己的 requirements/design/tasks 三件套。这样 my-ai-auto-dev 执行时上下文可控，不会因为 specs 太大导致丢失关键信息。
 
 ### Step 11: 输出总结
 

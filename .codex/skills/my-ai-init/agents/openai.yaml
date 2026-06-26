@@ -1,4 +1,0 @@
-interface:
-  display_name: "My AI Init"
-  short_description: "Initialize Codex project guidance"
-  default_prompt: "Use $my-ai-init to create or refresh Codex project guidance."

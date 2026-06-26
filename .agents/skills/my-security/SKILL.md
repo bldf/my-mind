@@ -111,11 +111,11 @@ METATRON 内部的 Agentic Loop 会自行决定是否追加扫描，无需外部
 
 ---
 
-## 与 my:ai 的分工
+## 与 my-ai-auto-dev 的分工
 
 | 检查类型 | 负责方 | 时机 |
 |----------|--------|------|
-| 硬编码密钥/token、.env 误提交、敏感文件入库 | my:ai（每个 task 的 Step 3） | 开发过程中 |
+| 硬编码密钥/token、.env 误提交、敏感文件入库 | my-ai-auto-dev（每个 task 的 Step 3） | 开发过程中 |
 | 端口扫描、Web 漏洞检测、渗透测试 | my-security（本 skill） | 项目部署后 |
 
 ## 设计决策
