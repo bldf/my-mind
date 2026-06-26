@@ -70,4 +70,7 @@ Playwright browsers may need to be installed once with `pnpm exec playwright ins
 
 GitHub Pages deployment is configured in `.github/workflows/pages.yml`. The workflow builds the docs site and publishes the playground under `/playground/`.
 
+- **Docs**: https://bldf.github.io/my-mind/
+- **Playground**: https://bldf.github.io/my-mind/playground/
+
 For npm package releases, see `apps/docs/docs/reference/npm-publishing.md`.
