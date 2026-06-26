@@ -3,14 +3,31 @@
 `MindMapEditor` supports controlled and uncontrolled usage. `MindMapViewer` uses
 the same viewport and selection model while disabling document edits.
 
-The default toolbar includes themes, fullscreen, zoom, fit view, search, and the
-inspector. Node sizing writes to `node.style.scale`, so it is distinct from
-canvas zoom and can be undone.
+The editable toolbar includes themes, undo, redo, reset-to-mount-state,
+fullscreen, zoom, fit view, search, and the inspector. Readonly editors and
+`MindMapViewer` omit editing history controls. Setting `search.hidden` removes
+the search entry even when a custom toolbar control list includes it.
 
-Desktop editing includes live drag previews, drop-to-reparent after a dwell on a
-node center, upper/lower sibling sort zones, and hover controls for adding a
-child or toggling a branch. Use the experimental `dragInteraction` prop to tune
-or disable those defaults.
+Wheel zoom is opt-in with `viewport.zoomOnScroll`. It uses pointer-anchored
+linear scaling, with `wheelZoomSensitivity` and `wheelZoomMaxStep` available for
+host tuning. Container resize automatically recenters the visible map at the
+current zoom unless `fitViewOnResize` is false, and pauses while dragging,
+resizing, or editing inside the canvas.
+
+MiniMap is hidden by default. Enable it explicitly; `pannable` and `zoomable`
+default to true:
+
+```tsx
+<MindMapEditor minimap={{ visible: true }} />
+```
+
+Node sizing writes to `node.style.scale`, so it is distinct from canvas zoom
+and can be undone.
+
+Desktop editing includes live subtree drag previews, immediate
+drop-to-reparent on a node center, upper/lower sibling sort zones, and hover
+controls for adding a child or toggling a branch. Use the experimental
+`dragInteraction` prop to tune or disable those defaults.
 
 `OutlineEditor` can be used beside the canvas. Both views update the same
 `MindMapDocument` through core commands.

@@ -11,6 +11,9 @@ import type { ReactNode } from "react";
 
 export type ViewToolbarControl =
   | "theme"
+  | "undo"
+  | "redo"
+  | "reset"
   | "fullscreen"
   | "zoomOut"
   | "zoomIn"
@@ -46,6 +49,15 @@ export interface ViewportConfig {
   zoomOnScroll?: boolean;
   panOnDrag?: boolean;
   fitViewOnInit?: boolean;
+  fitViewOnResize?: boolean;
+  wheelZoomSensitivity?: number;
+  wheelZoomMaxStep?: number;
+}
+
+export interface MiniMapConfig {
+  visible?: boolean;
+  pannable?: boolean;
+  zoomable?: boolean;
 }
 
 export interface InspectorConfig {
@@ -77,6 +89,7 @@ export interface MindMapEditorProps {
   nodeSizing?: NodeSizingConfig;
   breadcrumbs?: BreadcrumbConfig;
   viewport?: ViewportConfig;
+  minimap?: MiniMapConfig;
   inspector?: InspectorConfig;
   search?: SearchConfig;
   dragInteraction?: DragInteractionConfig;

@@ -27,12 +27,29 @@ async function getNodeBox(page: import("@playwright/test").Page, nodeId: string)
   return { locator, box };
 }
 
+async function waitForViewportSettled(page: import("@playwright/test").Page) {
+  let previousTransform = "";
+  let stablePolls = 0;
+  await expect
+    .poll(
+      async () => {
+        const currentTransform = await getViewportTransform(page);
+        stablePolls = currentTransform === previousTransform ? stablePolls + 1 : 0;
+        previousTransform = currentTransform;
+        return stablePolls;
+      },
+      { intervals: [100, 100, 100, 100, 100] },
+    )
+    .toBeGreaterThanOrEqual(2);
+}
+
 async function dragNodeToNode(
   page: import("@playwright/test").Page,
   sourceId: string,
   targetId: string,
   options: { targetY?: "top" | "center" | "bottom"; dropText?: string } = {},
 ) {
+  await waitForViewportSettled(page);
   const source = await getNodeBox(page, sourceId);
   const target = await getNodeBox(page, targetId);
   const sourceX = source.box.x + source.box.width / 2;
@@ -62,6 +79,13 @@ async function getViewportTransform(page: import("@playwright/test").Page) {
     .evaluate((element) => getComputedStyle(element).transform);
 }
 
+async function getViewportState(page: import("@playwright/test").Page) {
+  return page.locator(".react-flow__viewport").evaluate((element) => {
+    const matrix = new DOMMatrixReadOnly(getComputedStyle(element).transform);
+    return { x: matrix.e, y: matrix.f, zoom: matrix.a };
+  });
+}
+
 async function expectNodeInsideCanvas(page: import("@playwright/test").Page, nodeId: string) {
   await expect
     .poll(async () => {
@@ -89,12 +113,165 @@ async function expectNodeTitleNotClipped(page: import("@playwright/test").Page, 
     .toEqual({ horizontal: true, vertical: true });
 }
 
+async function loadSingleNodeResizeDocument(page: import("@playwright/test").Page) {
+  await page.getByLabel("Mind map JSON").fill(`{
+    "schemaVersion": "1.0",
+    "id": "resize-doc",
+    "title": "Resize map",
+    "rootId": "resize-root",
+    "nodes": {
+      "resize-root": {
+        "id": "resize-root",
+        "parentId": null,
+        "children": [],
+        "title": "Resize map",
+        "links": [],
+        "tagIds": [],
+        "collapsed": false,
+        "position": { "x": 0, "y": 0 },
+        "style": {},
+        "metadata": {}
+      }
+    },
+    "connections": [],
+    "tags": [],
+    "layout": { "direction": "right", "gapX": 180, "gapY": 88 },
+    "revision": 0,
+    "metadata": {}
+  }`);
+  await expect(page.getByLabel("Title for Resize map")).toBeVisible();
+}
+
 test("playground renders editor, JSON pane and toolbar", async ({ page }) => {
   await page.goto("/");
   await expect(page.getByLabel("Mind map playground")).toBeVisible();
   await expect(page.getByLabel("Mind map tools")).toBeVisible();
   await expect(page.getByRole("button", { name: "Themes" })).toBeVisible();
+  await expect(page.locator(".react-flow__controls")).toHaveCount(0);
   await expectNodeTitleNotClipped(page, "node-0");
+});
+
+test("toolbar and breadcrumbs stay inside a narrow editor without overlapping", async ({
+  page,
+  isMobile,
+}) => {
+  test.skip(isMobile, "The narrow desktop embed is covered with an explicit viewport.");
+
+  await page.setViewportSize({ width: 640, height: 820 });
+  await page.goto("/?showBreadcrumbs=1");
+  await expect(page.getByLabel("Node path")).toBeVisible();
+
+  const selectedNode = await getNodeBox(page, "node-5");
+  await selectedNode.locator.click();
+  await page.locator(".react-flow__pane").click({
+    button: "right",
+    position: { x: 12, y: 12 },
+  });
+  await expect(page.getByLabel("Node path").getByRole("button")).toHaveCount(3);
+
+  await expect
+    .poll(async () =>
+      page.locator(".mmn-editor").evaluate((editor) => {
+        const toolbar = editor.querySelector<HTMLElement>(".mmn-toolbar");
+        const breadcrumbs = editor.querySelector<HTMLElement>(".mmn-breadcrumbs");
+        if (!toolbar || !breadcrumbs) return false;
+        const editorRect = editor.getBoundingClientRect();
+        const toolbarRect = toolbar.getBoundingClientRect();
+        const breadcrumbsRect = breadcrumbs.getBoundingClientRect();
+        const overlaps =
+          toolbarRect.left < breadcrumbsRect.right &&
+          toolbarRect.right > breadcrumbsRect.left &&
+          toolbarRect.top < breadcrumbsRect.bottom &&
+          toolbarRect.bottom > breadcrumbsRect.top;
+        return (
+          !overlaps &&
+          toolbarRect.left >= editorRect.left &&
+          toolbarRect.right <= editorRect.right &&
+          breadcrumbsRect.left >= editorRect.left &&
+          breadcrumbsRect.right <= editorRect.right
+        );
+      }),
+    )
+    .toBe(true);
+});
+
+test("hidden search configuration removes the toolbar entry", async ({ page }) => {
+  await page.goto("/?hideSearch=1");
+  await expect(page.getByLabel("Mind map tools")).toBeVisible();
+  await expect(page.getByRole("button", { name: "Search" })).toHaveCount(0);
+});
+
+test("small wheel deltas zoom smoothly around the pointer", async ({ page, isMobile }) => {
+  test.skip(isMobile, "Desktop wheel input is covered separately from mobile touch basics.");
+
+  await page.goto("/");
+  const node = await getNodeBox(page, "node-1");
+  const pointer = {
+    x: node.box.x + node.box.width / 2,
+    y: node.box.y + node.box.height / 2,
+  };
+  const beforeViewport = await getViewportState(page);
+  const beforeBox = await node.locator.boundingBox();
+  if (!beforeBox) throw new Error("Node box is unavailable before wheel zoom");
+
+  await page.mouse.move(pointer.x, pointer.y);
+  await page.mouse.wheel(0, -20);
+
+  await expect
+    .poll(async () => (await getViewportState(page)).zoom)
+    .toBeGreaterThan(beforeViewport.zoom);
+  const afterViewport = await getViewportState(page);
+  expect(afterViewport.zoom - beforeViewport.zoom).toBeLessThan(0.05);
+
+  const afterBox = await node.locator.boundingBox();
+  if (!afterBox) throw new Error("Node box is unavailable after wheel zoom");
+  const beforeCenter = {
+    x: beforeBox.x + beforeBox.width / 2,
+    y: beforeBox.y + beforeBox.height / 2,
+  };
+  const afterCenter = {
+    x: afterBox.x + afterBox.width / 2,
+    y: afterBox.y + afterBox.height / 2,
+  };
+  expect(Math.abs(afterCenter.x - beforeCenter.x)).toBeLessThan(4);
+  expect(Math.abs(afterCenter.y - beforeCenter.y)).toBeLessThan(4);
+});
+
+test("fullscreen toolbar button enters and exits the editor container", async ({ page }) => {
+  await page.addInitScript(() => {
+    let fullscreenElement: Element | null = null;
+    Object.defineProperty(document, "fullscreenElement", {
+      configurable: true,
+      get: () => fullscreenElement,
+    });
+    Object.defineProperty(HTMLElement.prototype, "requestFullscreen", {
+      configurable: true,
+      value: async () => {
+        fullscreenElement = document.querySelector(".mmn-editor");
+        document.dispatchEvent(new Event("fullscreenchange"));
+      },
+    });
+    Object.defineProperty(document, "exitFullscreen", {
+      configurable: true,
+      value: async () => {
+        fullscreenElement = null;
+        document.dispatchEvent(new Event("fullscreenchange"));
+      },
+    });
+  });
+
+  await page.goto("/");
+  await page.getByRole("button", { name: "Fullscreen" }).click();
+  await expect(page.getByRole("button", { name: "Exit fullscreen" })).toBeVisible();
+  await expect
+    .poll(() =>
+      page.locator(".mmn-editor").evaluate((element) => document.fullscreenElement === element),
+    )
+    .toBe(true);
+
+  await page.getByRole("button", { name: "Exit fullscreen" }).click();
+  await expect(page.getByRole("button", { name: "Fullscreen" })).toBeVisible();
+  await expect.poll(() => page.evaluate(() => document.fullscreenElement)).toBeNull();
 });
 
 test("json parse errors are visible", async ({ page }) => {
@@ -289,6 +466,7 @@ test("Graphite theme dark mode visual style data-theme-mode is set", async ({ pa
   // Check that the data-theme-mode attribute is set on .mmn-editor
   const editor = page.locator(".mmn-editor");
   await expect(editor).toHaveAttribute("data-theme-mode", "dark");
+  await expect(editor).toHaveCSS("background-color", "rgb(16, 23, 42)");
 });
 
 test("dragging a node follows the pointer and then returns to the stable layout", async ({
@@ -301,9 +479,16 @@ test("dragging a node follows the pointer and then returns to the stable layout"
   );
 
   await page.goto("/");
+  await waitForViewportSettled(page);
+  await page.locator(".mmn-toolbar").getByRole("button", { name: "Zoom in" }).click();
+  const viewportBeforeDrag = await getViewportTransform(page);
   const source = await getNodeBox(page, "node-1");
+  const child = await getNodeBox(page, "node-5");
   const startX = source.box.x;
   const startY = source.box.y;
+  const childStartX = child.box.x;
+  const childStartY = child.box.y;
+  const beforeDocument = await getPlaygroundDocument(page);
 
   await page.mouse.move(source.box.x + source.box.width / 2, source.box.y + source.box.height / 2);
   await page.mouse.down();
@@ -315,6 +500,20 @@ test("dragging a node follows the pointer and then returns to the stable layout"
   await expect
     .poll(async () => Math.round(((await source.locator.boundingBox())?.x ?? startX) - startX))
     .toBeGreaterThan(20);
+  await expect
+    .poll(async () => {
+      const sourceBox = await source.locator.boundingBox();
+      const childBox = await child.locator.boundingBox();
+      if (!sourceBox || !childBox) return false;
+      const sourceDelta = { x: sourceBox.x - startX, y: sourceBox.y - startY };
+      const childDelta = { x: childBox.x - childStartX, y: childBox.y - childStartY };
+      return (
+        childDelta.x > 20 &&
+        Math.abs(childDelta.x - sourceDelta.x) < 8 &&
+        Math.abs(childDelta.y - sourceDelta.y) < 8
+      );
+    })
+    .toBe(true);
   const canvas = await page.locator(".react-flow").boundingBox();
   if (!canvas) throw new Error("React Flow canvas is not visible");
   await page.mouse.move(canvas.x + canvas.width - 120, canvas.y + canvas.height - 120, {
@@ -332,6 +531,97 @@ test("dragging a node follows the pointer and then returns to the stable layout"
       Math.abs(Math.round(((await source.locator.boundingBox())?.y ?? startY) - startY)),
     )
     .toBeLessThan(30);
+  await expect
+    .poll(async () => (await getPlaygroundDocument(page)).nodes["node-5"]?.parentId)
+    .toBe(beforeDocument.nodes["node-5"]!.parentId);
+  await expect.poll(async () => getViewportTransform(page)).toBe(viewportBeforeDrag);
+});
+
+test("container resize recenters a single-node document", async ({ page, isMobile }) => {
+  test.skip(isMobile, "Desktop responsive canvas resizing is covered separately.");
+
+  await page.goto("/");
+  await loadSingleNodeResizeDocument(page);
+  await page.getByRole("button", { name: "Zoom out" }).click();
+  await waitForViewportSettled(page);
+
+  const beforeViewport = await getViewportState(page);
+  await page.locator(".workspace").evaluate((element) => {
+    (element as HTMLElement).style.gridTemplateColumns = "520px minmax(0, 1fr)";
+  });
+
+  await expect
+    .poll(async () => {
+      const node = await getNodeBox(page, "resize-root");
+      const canvas = await page.locator(".react-flow").boundingBox();
+      if (!canvas) return Number.POSITIVE_INFINITY;
+      const nodeCenterX = node.box.x + node.box.width / 2;
+      const canvasCenterX = canvas.x + canvas.width / 2;
+      return Math.abs(nodeCenterX - canvasCenterX);
+    })
+    .toBeLessThan(12);
+  await expect
+    .poll(async () => (await getViewportState(page)).x)
+    .not.toBe(beforeViewport.x);
+  await expect
+    .poll(async () => (await getViewportState(page)).zoom)
+    .toBeCloseTo(beforeViewport.zoom, 5);
+});
+
+test("container resize waits for title editing to finish before recentering", async ({
+  page,
+  isMobile,
+}) => {
+  test.skip(isMobile, "Desktop responsive canvas resizing is covered separately.");
+
+  await page.goto("/");
+  await loadSingleNodeResizeDocument(page);
+  await page.getByRole("button", { name: "Zoom in" }).click();
+  await waitForViewportSettled(page);
+
+  const title = page.getByLabel("Title for Resize map");
+  await title.focus();
+  const viewportBeforeResize = await getViewportTransform(page);
+  await page.locator(".workspace").evaluate((element) => {
+    (element as HTMLElement).style.gridTemplateColumns = "520px minmax(0, 1fr)";
+  });
+  await page.waitForTimeout(250);
+  expect(await getViewportTransform(page)).toBe(viewportBeforeResize);
+
+  await title.blur();
+  await expect
+    .poll(async () => {
+      const node = await getNodeBox(page, "resize-root");
+      const canvas = await page.locator(".react-flow").boundingBox();
+      if (!canvas) return Number.POSITIVE_INFINITY;
+      const nodeCenterX = node.box.x + node.box.width / 2;
+      const canvasCenterX = canvas.x + canvas.width / 2;
+      return Math.abs(nodeCenterX - canvasCenterX);
+    })
+    .toBeLessThan(12);
+});
+
+test("title editing does not resize or relayout the canvas", async ({ page, isMobile }) => {
+  test.skip(isMobile, "Desktop title editing viewport stability is covered separately.");
+
+  await page.goto("/");
+  await loadSingleNodeResizeDocument(page);
+  await page.getByRole("button", { name: "Zoom in" }).click();
+  await waitForViewportSettled(page);
+
+  const beforeViewport = await getViewportTransform(page);
+  const beforePosition = (await getPlaygroundDocument(page)).nodes["resize-root"]?.position;
+  const title = page.getByLabel("Title for Resize map");
+  await title.fill("Resize map\nwith a much longer edited title");
+  await title.blur();
+
+  await expect
+    .poll(async () => (await getPlaygroundDocument(page)).nodes["resize-root"]?.title)
+    .toBe("Resize map\nwith a much longer edited title");
+  expect(await getViewportTransform(page)).toBe(beforeViewport);
+  expect((await getPlaygroundDocument(page)).nodes["resize-root"]?.position).toEqual(
+    beforePosition,
+  );
 });
 
 test("dragging to node center reparents as a child on release", async ({ page, isMobile }) => {
@@ -364,6 +654,7 @@ test("dragging away from a target before release does not commit the stale drop 
   );
 
   await page.goto("/");
+  await waitForViewportSettled(page);
   const source = await getNodeBox(page, "node-1");
   const target = await getNodeBox(page, "node-2");
   const canvas = await page.locator(".react-flow").boundingBox();

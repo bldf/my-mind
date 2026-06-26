@@ -44,20 +44,32 @@
   --mmn-danger: #ef4444;
 }
 
-.mmn-breadcrumbs {
+.mmn-editor__topbar {
   position: absolute;
   top: 12px;
   left: 12px;
-  z-index: 10;
+  right: 12px;
+  z-index: 12;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 12px;
+  align-items: start;
+  pointer-events: none;
+}
+
+.mmn-breadcrumbs {
   display: flex;
   gap: 6px;
   align-items: center;
-  max-width: min(55%, 720px);
+  min-width: 0;
+  max-width: 720px;
+  overflow-x: auto;
   padding: 4px 8px;
   background: color-mix(in srgb, var(--mmn-surface) 92%, transparent);
   border: 1px solid var(--mmn-border);
   border-radius: 8px;
   box-shadow: var(--mmn-shadow);
+  pointer-events: auto;
 }
 
 .mmn-breadcrumbs button,
@@ -93,17 +105,22 @@
 }
 
 .mmn-toolbar {
-  position: absolute;
-  top: 12px;
-  right: 12px;
-  z-index: 12;
   display: flex;
+  max-width: 100%;
+  justify-self: end;
   gap: 4px;
+  overflow-x: auto;
   padding: 4px;
   background: color-mix(in srgb, var(--mmn-surface) 92%, transparent);
   border: 1px solid var(--mmn-border);
   border-radius: 8px;
   box-shadow: var(--mmn-shadow);
+  pointer-events: auto;
+  scrollbar-width: thin;
+}
+
+.mmn-toolbar button {
+  flex: 0 0 auto;
 }
 
 .mmn-toolbar button:hover,
@@ -113,6 +130,20 @@
 .mmn-breadcrumbs button:hover,
 .mmn-outline button:hover {
   background: var(--mmn-control-hover);
+}
+
+.mmn-toolbar button[aria-pressed="true"] {
+  background: var(--mmn-control-hover);
+  color: var(--mmn-selected);
+}
+
+.mmn-toolbar button:disabled {
+  cursor: not-allowed;
+  opacity: 0.4;
+}
+
+.mmn-toolbar button:disabled:hover {
+  background: transparent;
 }
 
 .mmn-node {
@@ -847,41 +878,30 @@
   stroke: var(--mmn-border);
 }
 
-/* React Flow Controls overrides */
-.mmn-editor .react-flow__controls {
-  box-shadow: var(--mmn-shadow);
-  border-radius: 6px;
-  overflow: hidden;
-  border: 1px solid var(--mmn-border);
-}
-
-.mmn-editor .react-flow__controls-button {
-  background: var(--mmn-surface);
-  border: 0;
-  border-bottom: 1px solid var(--mmn-border);
-  color: var(--mmn-node-text);
-  fill: currentColor;
-}
-
-.mmn-editor .react-flow__controls-button:last-child {
-  border-bottom: 0;
-}
-
-.mmn-editor .react-flow__controls-button:hover {
-  background: var(--mmn-control-hover);
-}
-
-.mmn-editor .react-flow__controls-button svg {
-  fill: currentColor;
-}
-
 @media (max-width: 760px) {
   .mmn-editor {
     min-height: 520px;
   }
 
+  .mmn-editor__topbar {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 8px;
+  }
+
+  .mmn-toolbar {
+    grid-row: 1;
+    width: 100%;
+  }
+
   .mmn-breadcrumbs {
-    max-width: calc(100% - 120px);
+    grid-row: 2;
+    width: 100%;
+    max-width: none;
+  }
+
+  .mmn-editor[data-has-breadcrumbs="true"] .mmn-theme-panel,
+  .mmn-editor[data-has-breadcrumbs="true"] .mmn-search-panel {
+    top: 104px;
   }
 
   .mmn-inspector {

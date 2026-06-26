@@ -24,3 +24,10 @@
 ## 2026-06-20 - Hyperlink Node Navigation / readonly playground E2E path
 
 - `apps/playground` 支持 `?readonly=1` 查询参数：数据面板仍可导入 JSON/Markdown/Mermaid，右侧画布以 `MindMapEditor readonly` 渲染。后续需要验证 Viewer/readonly-only 交互时可复用该路径，不必为 E2E 额外启动 readonly example dev server。
+
+## 2026-06-25 - Viewport Interaction Controls Polish / wheel 与子树拖拽
+
+- React Flow 的 `onPaneScroll` 只在 wheel target 恰好是 pane 时触发，无法覆盖节点上方的指针锚点缩放；SDK 需要在 `.react-flow` 外层使用 `{ capture: true, passive: false }` 的原生 wheel listener，并在卸载或配置变化时清理。
+- 子树拖拽需要区分 `visualNodeIds` 与 `commitNodeIds`：可见后代跟随视觉位移并从 drop target 中排除，但命中矩形和最终 `node.moveMany` 仍只使用顶层提交节点，否则大子树外接框会破坏原有 reparent/sort 区域。
+- 容器 `ResizeObserver` 不应依赖 `nodesInitialized` 或渲染节点数量重建；拖拽提交后的节点重初始化会让首次 observer 回调把 `clientWidth` 与 `contentRect` 差异误判为 resize。首次回调只建立同口径尺寸基线，后续真实宽高变化才触发保留当前 zoom 的居中。
+- Playwright 在读取节点 bounding box 前应等待初始 viewport transform 连续稳定，避免异步 `fitView` 让鼠标坐标过期并制造拖拽假失败。

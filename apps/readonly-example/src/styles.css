@@ -30,8 +30,7 @@ body {
   border-radius: 0;
 }
 
-.readonly-demo .react-flow__minimap,
-.readonly-demo .react-flow__controls {
+.readonly-demo .react-flow__minimap {
   display: none;
 }
 

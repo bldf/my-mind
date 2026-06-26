@@ -19,7 +19,7 @@ export const defaultThemes: MindMapTheme[] = [
     name: "Graphite",
     mode: "dark",
     colors: {
-      canvas: "#111315",
+      canvas: "#10172a",
       node: "#1f242a",
       nodeText: "#f8fafc",
       edge: "#8b98a9",

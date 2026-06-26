@@ -90,6 +90,14 @@ export default function App() {
     if (typeof window === "undefined") return false;
     return new URLSearchParams(window.location.search).get("readonly") === "1";
   }, []);
+  const searchHidden = useMemo(() => {
+    if (typeof window === "undefined") return false;
+    return new URLSearchParams(window.location.search).get("hideSearch") === "1";
+  }, []);
+  const showBreadcrumbs = useMemo(() => {
+    if (typeof window === "undefined") return false;
+    return new URLSearchParams(window.location.search).get("showBreadcrumbs") === "1";
+  }, []);
   const initialDocument = useMemo(() => {
     const parsed = parseDocument(JSON.stringify(fixture));
     if (!parsed.ok) throw new Error(parsed.error.message);
@@ -239,10 +247,23 @@ export default function App() {
             value={document}
             height="100%"
             readonly={readonlyMode}
-            breadcrumbs={{ hidden: true }}
+            breadcrumbs={{ hidden: !showBreadcrumbs }}
             inspector={{ hidden: true }}
+            search={{ hidden: searchHidden }}
+            viewport={{ zoomOnScroll: true }}
             toolbar={{
-              controls: ["theme", "search", "fullscreen", "zoomOut", "zoomIn", "fitView", "export"],
+              controls: [
+                "theme",
+                "undo",
+                "redo",
+                "reset",
+                "search",
+                "fullscreen",
+                "zoomOut",
+                "zoomIn",
+                "fitView",
+                "export",
+              ],
             }}
             onChange={readonlyMode ? undefined : updateDocument}
             onError={(mindMapError) => setError(`${mindMapError.code}: ${mindMapError.message}`)}

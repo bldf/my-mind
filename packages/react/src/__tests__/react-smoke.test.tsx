@@ -8,6 +8,7 @@ import {
   type MindMapNode,
 } from "@my-mind-node/core";
 import { ReactFlowProvider, type NodeProps } from "@xyflow/react";
+import { useState } from "react";
 import {
   getDropGeometry,
   getDropIntentLabel,
@@ -17,10 +18,11 @@ import {
   isMoveNoOp,
 } from "../drag-interactions";
 import { documentToFlow } from "../document-to-flow";
-import { MindMapEditor } from "../MindMapEditor";
+import { isTextInputActive, MindMapEditor } from "../MindMapEditor";
 import { MindMapViewer } from "../MindMapViewer";
 import { MindNode, type MindNodeData } from "../nodes/MindNode";
 import { OutlineEditor } from "../OutlineEditor";
+import { defaultThemes } from "../themes";
 
 afterEach(() => cleanup());
 
@@ -63,10 +65,219 @@ function renderMindNode(data: MindNodeData, selected = false) {
 }
 
 describe("@my-mind-node/react", () => {
+  it("detects active text inputs from the container document", () => {
+    const iframe = globalThis.document.createElement("iframe");
+    globalThis.document.body.append(iframe);
+    const iframeDocument = iframe.contentDocument!;
+    const container = iframeDocument.createElement("div");
+    const textarea = iframeDocument.createElement("textarea");
+    container.append(textarea);
+    iframeDocument.body.append(container);
+
+    textarea.focus();
+
+    expect(isTextInputActive(container)).toBe(true);
+    iframe.remove();
+  });
+
   it("renders a readonly viewer", () => {
     const document = createEmptyDocument({ rootTitle: "Viewer root" });
-    render(<MindMapViewer value={document} height={360} />);
+    const { container } = render(<MindMapViewer value={document} height={360} />);
     expect(screen.getByLabelText("Mind map tools")).toBeTruthy();
+    expect(screen.queryByRole("button", { name: "Undo" })).toBeNull();
+    expect(screen.queryByRole("button", { name: "Redo" })).toBeNull();
+    expect(screen.queryByRole("button", { name: "Reset" })).toBeNull();
+    expect(container.querySelector(".react-flow__controls")).toBeNull();
+  });
+
+  it("keeps MiniMap opt-in for editors and viewers", () => {
+    const document = createEmptyDocument({ rootTitle: "MiniMap root" });
+    const editor = render(<MindMapEditor value={document} />);
+    expect(editor.container.querySelector(".react-flow__minimap")).toBeNull();
+    editor.unmount();
+
+    const viewer = render(<MindMapViewer value={document} />);
+    expect(viewer.container.querySelector(".react-flow__minimap")).toBeNull();
+    viewer.unmount();
+
+    const enabled = render(<MindMapEditor value={document} minimap={{ visible: true }} />);
+    expect(enabled.container.querySelector(".react-flow__minimap")).toBeTruthy();
+  });
+
+  it("filters hidden search and readonly history controls from explicit toolbars", () => {
+    const document = createEmptyDocument({ rootTitle: "Filtered toolbar" });
+    render(
+      <MindMapViewer
+        value={document}
+        search={{ hidden: true }}
+        toolbar={{ controls: ["search", "undo", "redo", "reset", "fullscreen"] }}
+      />,
+    );
+
+    expect(screen.queryByRole("button", { name: "Search" })).toBeNull();
+    expect(screen.queryByRole("button", { name: "Undo" })).toBeNull();
+    expect(screen.queryByRole("button", { name: "Redo" })).toBeNull();
+    expect(screen.queryByRole("button", { name: "Reset" })).toBeNull();
+    expect(screen.getByRole("button", { name: "Fullscreen" })).toBeTruthy();
+  });
+
+  it("updates toolbar history state and resets to the mount document", async () => {
+    const document = createEmptyDocument({ rootTitle: "Initial title" });
+    render(<MindMapEditor defaultValue={document} />);
+
+    const undoButton = screen.getByRole<HTMLButtonElement>("button", { name: "Undo" });
+    const redoButton = screen.getByRole<HTMLButtonElement>("button", { name: "Redo" });
+    const resetButton = screen.getByRole<HTMLButtonElement>("button", { name: "Reset" });
+    expect(undoButton.disabled).toBe(true);
+    expect(redoButton.disabled).toBe(true);
+    expect(resetButton.disabled).toBe(true);
+
+    fireEvent.change(screen.getByLabelText("Title for Initial title"), {
+      target: { value: "Edited title" },
+    });
+    fireEvent.blur(screen.getByLabelText("Title for Initial title"));
+
+    await waitFor(() => expect(undoButton.disabled).toBe(false));
+    expect(resetButton.disabled).toBe(false);
+
+    fireEvent.click(undoButton);
+    await waitFor(() => expect(screen.getByLabelText("Title for Initial title")).toBeTruthy());
+    expect(redoButton.disabled).toBe(false);
+
+    fireEvent.click(redoButton);
+    await waitFor(() => expect(screen.getByLabelText("Title for Edited title")).toBeTruthy());
+
+    fireEvent.click(resetButton);
+    await waitFor(() => expect(screen.getByLabelText("Title for Initial title")).toBeTruthy());
+    expect(undoButton.disabled).toBe(true);
+    expect(redoButton.disabled).toBe(true);
+    expect(resetButton.disabled).toBe(true);
+  });
+
+  it("requests the mount document through onChange when a controlled editor resets", async () => {
+    const initialDocument = createEmptyDocument({ rootTitle: "Controlled initial" });
+    const onChange = vi.fn();
+
+    function ControlledEditor() {
+      const [value, setValue] = useState(initialDocument);
+      return (
+        <MindMapEditor
+          value={value}
+          onChange={(nextDocument) => {
+            onChange(nextDocument);
+            setValue(nextDocument);
+          }}
+        />
+      );
+    }
+
+    render(<ControlledEditor />);
+    fireEvent.change(screen.getByLabelText("Title for Controlled initial"), {
+      target: { value: "Controlled edit" },
+    });
+    fireEvent.blur(screen.getByLabelText("Title for Controlled initial"));
+    await waitFor(() => expect(screen.getByLabelText("Title for Controlled edit")).toBeTruthy());
+
+    fireEvent.click(screen.getByRole("button", { name: "Reset" }));
+    await waitFor(() => expect(screen.getByLabelText("Title for Controlled initial")).toBeTruthy());
+    expect(onChange.mock.lastCall?.[0]).toEqual(initialDocument);
+  });
+
+  it("syncs fullscreen toolbar state for button and external exits", async () => {
+    const mindMap = createEmptyDocument({ rootTitle: "Fullscreen root" });
+    const { container } = render(<MindMapEditor value={mindMap} />);
+    const editor = container.querySelector<HTMLElement>(".mmn-editor")!;
+    let fullscreenElement: Element | null = null;
+
+    Object.defineProperty(globalThis.document, "fullscreenElement", {
+      configurable: true,
+      get: () => fullscreenElement,
+    });
+    Object.defineProperty(editor, "requestFullscreen", {
+      configurable: true,
+      value: vi.fn(async () => {
+        fullscreenElement = editor;
+        globalThis.document.dispatchEvent(new Event("fullscreenchange"));
+      }),
+    });
+    Object.defineProperty(globalThis.document, "exitFullscreen", {
+      configurable: true,
+      value: vi.fn(async () => {
+        fullscreenElement = null;
+        globalThis.document.dispatchEvent(new Event("fullscreenchange"));
+      }),
+    });
+
+    fireEvent.click(screen.getByRole("button", { name: "Fullscreen" }));
+    await waitFor(() =>
+      expect(screen.getByRole("button", { name: "Exit fullscreen" })).toBeTruthy(),
+    );
+
+    fullscreenElement = null;
+    globalThis.document.dispatchEvent(new Event("fullscreenchange"));
+    await waitFor(() => expect(screen.getByRole("button", { name: "Fullscreen" })).toBeTruthy());
+
+    fireEvent.click(screen.getByRole("button", { name: "Fullscreen" }));
+    await waitFor(() =>
+      expect(screen.getByRole("button", { name: "Exit fullscreen" })).toBeTruthy(),
+    );
+    fireEvent.click(screen.getByRole("button", { name: "Exit fullscreen" }));
+    await waitFor(() => expect(screen.getByRole("button", { name: "Fullscreen" })).toBeTruthy());
+  });
+
+  it("uses the Graphite canvas token and cleans up resize observation", () => {
+    const instances: ResizeObserverTestDouble[] = [];
+    const originalResizeObserver = globalThis.ResizeObserver;
+    class ResizeObserverTestDouble {
+      observedElements: Element[] = [];
+      disconnect = vi.fn();
+      unobserve = vi.fn();
+
+      constructor(_callback: ResizeObserverCallback) {
+        instances.push(this);
+      }
+
+      observe = vi.fn((element: Element) => {
+        this.observedElements.push(element);
+      });
+    }
+    globalThis.ResizeObserver =
+      ResizeObserverTestDouble as unknown as typeof globalThis.ResizeObserver;
+
+    try {
+      const document = createEmptyDocument({ rootTitle: "Graphite root" });
+      const graphite = defaultThemes.find((theme) => theme.id === "graphite")!;
+      const editor = render(<MindMapEditor value={document} theme={graphite} />);
+      const editorElement = editor.container.querySelector<HTMLElement>(".mmn-editor")!;
+      const editorObserver = instances.find((instance) =>
+        instance.observedElements.includes(editorElement),
+      );
+      expect(editorElement.style.getPropertyValue("--mmn-canvas")).toBe("#10172a");
+      expect(editorObserver).toBeTruthy();
+
+      editor.rerender(<MindMapEditor value={createDocumentWithRootChildren()} theme={graphite} />);
+      expect(
+        instances.filter((instance) => instance.observedElements.includes(editorElement)),
+      ).toHaveLength(1);
+      expect(editorObserver!.disconnect).not.toHaveBeenCalled();
+
+      editor.unmount();
+      expect(editorObserver!.disconnect).toHaveBeenCalledOnce();
+
+      const instanceCount = instances.length;
+      const disabled = render(
+        <MindMapEditor value={document} viewport={{ fitViewOnResize: false }} />,
+      );
+      const disabledEditor = disabled.container.querySelector<HTMLElement>(".mmn-editor")!;
+      expect(
+        instances
+          .slice(instanceCount)
+          .some((instance) => instance.observedElements.includes(disabledEditor)),
+      ).toBe(false);
+      disabled.unmount();
+    } finally {
+      globalThis.ResizeObserver = originalResizeObserver;
+    }
   });
 
   it("renders a controlled document after its root id changes", async () => {
@@ -521,6 +732,22 @@ describe("@my-mind-node/react", () => {
 
     const nextDocument = onChange.mock.calls.at(-1)?.[0] as MindMapDocument;
     expect(nextDocument.nodes[nextDocument.rootId]!.title).toBe("Line one\nLine two");
+  });
+
+  it("does not relayout node positions when editing a title", () => {
+    const document = createEmptyDocument({ rootTitle: "Root" });
+    document.nodes[document.rootId]!.position = { x: 42, y: -18 };
+    const onChange = vi.fn();
+    render(<MindMapEditor value={document} onChange={onChange} />);
+
+    const title = screen.getByLabelText("Title for Root");
+    fireEvent.change(title, {
+      target: { value: "Root with a much longer title\nthat should not resize the canvas" },
+    });
+    fireEvent.blur(title);
+
+    const nextDocument = onChange.mock.calls.at(-1)?.[0] as MindMapDocument;
+    expect(nextDocument.nodes[nextDocument.rootId]!.position).toEqual({ x: 42, y: -18 });
   });
 
   it("handles continuous 1:1 dragging and commits the scale value on release", () => {
