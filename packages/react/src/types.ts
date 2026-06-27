@@ -20,11 +20,30 @@ export type ViewToolbarControl =
   | "fitView"
   | "export"
   | "search"
-  | "inspector";
+  | "inspector"
+  | "copy";
+
+export type CopyDataFormat = "json" | "markdown" | "mermaid";
+
+export interface CopyDataRequest {
+  format: CopyDataFormat;
+  document: MindMapDocument;
+}
+
+export type CopyDataResult =
+  | { ok: true; text: string }
+  | { ok: false; error: MindMapError };
+
+export interface ToolbarCopyConfig {
+  formats?: CopyDataFormat[];
+  disabled?: boolean;
+  labels?: Partial<Record<CopyDataFormat, string>>;
+}
 
 export interface ToolbarConfig {
   controls?: ViewToolbarControl[];
   hidden?: boolean;
+  copy?: ToolbarCopyConfig;
 }
 
 export interface ThemePanelConfig {
@@ -115,6 +134,10 @@ export interface MindMapEditorProps {
   onSearchResultClick?: (result: SearchResult) => void;
   onError?: (error: MindMapError) => void;
   onOpenLink?: (url: string, node: MindMapNode) => void;
+  onCopyData?: (
+    request: CopyDataRequest,
+  ) => string | CopyDataResult | Promise<string | CopyDataResult>;
+  onCopySuccess?: (format: CopyDataFormat) => void;
 }
 
 export interface MindMapViewerProps extends Omit<MindMapEditorProps, "readonly" | "onChange"> {

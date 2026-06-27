@@ -1023,11 +1023,11 @@ test.describe("Branch List Focus Layout", () => {
     await page.locator(".mmn-branch-toggle-btn").click();
     await expect(page.locator(".mmn-branch-list-panel")).toBeVisible();
 
-    const items = page.locator(".mmn-branch-list-item");
-    await expect(items).toHaveCount(4);
+    const rootItems = page.locator('.mmn-branch-list-item[aria-level="1"]');
+    await expect(rootItems).toHaveCount(4);
 
-    const firstItem = items.first();
-    const secondItem = items.nth(1);
+    const firstItem = rootItems.first();
+    const secondItem = rootItems.nth(1);
 
     // First item selected by default
     await expect(firstItem).toHaveClass(/mmn-branch-list-item--selected/);

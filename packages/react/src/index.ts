@@ -12,3 +12,4 @@ export * from "./components/BranchListPanel";
 export * from "./nodes/MindNode";
 export * from "./edges/BezierEdge";
 export * from "./layout-helpers";
+export * from "./branch-tree";

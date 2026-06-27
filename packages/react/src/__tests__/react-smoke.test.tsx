@@ -1,4 +1,4 @@
-import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { act, cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import {
   asNodeId,
@@ -994,12 +994,14 @@ describe("@my-mind-node/react", () => {
   it("enters split layout and switches branch without triggering onChange", async () => {
     const doc = createDeepBranchListDocument();
     const onChange = vi.fn();
-    const { container } = render(<MindMapEditor value={doc} onChange={onChange} />);
+    const { container } = render(<MindMapEditor value={doc} onChange={onChange} branchListLayout={{ defaultOpen: true }} />);
 
-    // Click toggle button to enter split layout
+    // Click toggle button to exit split layout, then click it again to enter it
     const toggleBtn = container.querySelector(".mmn-branch-toggle-btn");
     expect(toggleBtn).toBeTruthy();
-    fireEvent.click(toggleBtn!);
+    fireEvent.click(toggleBtn!); // Exit split layout
+    expect(container.querySelector(".mmn-branch-layout")).toBeNull();
+    fireEvent.click(toggleBtn!); // Enter split layout again
 
     // Should render split shell and side panel
     expect(container.querySelector(".mmn-branch-layout")).toBeTruthy();
@@ -1007,12 +1009,12 @@ describe("@my-mind-node/react", () => {
 
     // By default first level-1 child is selected (Branch A)
     const listItems = container.querySelectorAll(".mmn-branch-list-item");
-    expect(listItems).toHaveLength(2);
+    expect(listItems).toHaveLength(4);
     expect(listItems[0]?.getAttribute("aria-current")).toBe("page");
 
-    // Click Branch B in list to switch
-    fireEvent.click(listItems[1]!);
-    expect(listItems[1]?.getAttribute("aria-current")).toBe("page");
+    // Click Branch B in list to switch (Branch B is index 2, Leaf A is index 1)
+    fireEvent.click(listItems[2]!);
+    expect(listItems[2]?.getAttribute("aria-current")).toBe("page");
 
     // Confirm that onChange was never called for this layout navigation
     expect(onChange).not.toHaveBeenCalled();
@@ -1067,5 +1069,109 @@ describe("@my-mind-node/react", () => {
     fireEvent.click(toggleBtn!);
     expect(container.querySelector(".mmn-branch-layout")).toBeTruthy();
     expect(container.querySelector(".mmn-branch-list-panel")).toBeTruthy();
+  });
+
+  it("supports copying data from the toolbar copy dropdown", async () => {
+    const doc = createDeepBranchListDocument();
+    const onCopyData = vi.fn().mockImplementation(({ format }) => {
+      if (format === "json") return "mock-json";
+      return "mock-format";
+    });
+    const onCopySuccess = vi.fn();
+    if (!navigator.clipboard) {
+      Object.defineProperty(navigator, "clipboard", {
+        value: {
+          writeText: async () => {},
+        },
+        writable: true,
+        configurable: true,
+      });
+    }
+    const writeTextSpy = vi.spyOn(navigator.clipboard, "writeText").mockResolvedValue(undefined);
+
+    const { container } = render(
+      <MindMapEditor value={doc} onCopyData={onCopyData} onCopySuccess={onCopySuccess} />,
+    );
+
+    const copyContainer = container.querySelector(".mmn-toolbar__copy-container");
+    expect(copyContainer).toBeTruthy();
+
+    const mainBtn = copyContainer!.querySelector("button");
+    expect(mainBtn).toBeTruthy();
+
+    fireEvent.mouseEnter(copyContainer!);
+    const dropdown = copyContainer!.querySelector(".mmn-toolbar__copy-menu");
+    expect(dropdown).toBeTruthy();
+
+    const formatButtons = dropdown!.querySelectorAll("button");
+    expect(formatButtons).toHaveLength(3);
+    expect(formatButtons[2]!.textContent).toBe("MERMAID");
+
+    fireEvent.click(formatButtons[2]!);
+    await waitFor(() => {
+      expect(onCopyData).toHaveBeenCalledWith({ format: "mermaid", document: doc });
+      expect(writeTextSpy).toHaveBeenCalledWith("mock-format");
+      expect(onCopySuccess).toHaveBeenCalledWith("mermaid");
+      expect(screen.getByRole("status").textContent).toBe("Copied MERMAID");
+    });
+    writeTextSpy.mockRestore();
+  });
+
+  it("keeps the toolbar copy dropdown open while moving from the trigger to the menu", () => {
+    vi.useFakeTimers();
+    try {
+      const doc = createDeepBranchListDocument();
+      const { container } = render(<MindMapEditor value={doc} />);
+
+      const copyContainer = container.querySelector(".mmn-toolbar__copy-container");
+      expect(copyContainer).toBeTruthy();
+
+      fireEvent.mouseEnter(copyContainer!);
+      expect(copyContainer!.querySelector(".mmn-toolbar__copy-menu")).toBeTruthy();
+
+      fireEvent.mouseLeave(copyContainer!);
+      expect(copyContainer!.querySelector(".mmn-toolbar__copy-menu")).toBeTruthy();
+
+      fireEvent.mouseEnter(copyContainer!);
+      act(() => vi.advanceTimersByTime(200));
+      expect(copyContainer!.querySelector(".mmn-toolbar__copy-menu")).toBeTruthy();
+
+      fireEvent.mouseLeave(copyContainer!);
+      act(() => vi.advanceTimersByTime(200));
+      expect(copyContainer!.querySelector(".mmn-toolbar__copy-menu")).toBeFalsy();
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("opens the branch tree expanded after entering split layout from the toggle", () => {
+    const doc = createDeepBranchListDocument();
+    const { container } = render(<MindMapEditor value={doc} />);
+
+    fireEvent.click(container.querySelector(".mmn-branch-toggle-btn")!);
+
+    expect(container.querySelector(".mmn-branch-list-panel")).toBeTruthy();
+    expect(container.querySelectorAll(".mmn-branch-list-item")).toHaveLength(4);
+  });
+
+  it("supports tree folding in the branch sidebar", () => {
+    const doc = createDeepBranchListDocument();
+    const { container } = render(<MindMapEditor value={doc} branchListLayout={{ defaultOpen: true }} />);
+
+    expect(container.querySelector(".mmn-branch-list-panel")).toBeTruthy();
+
+    let listItems = container.querySelectorAll(".mmn-branch-list-item");
+    expect(listItems).toHaveLength(4);
+
+    const toggleBtn = container.querySelector(".mmn-branch-list-item__toggle");
+    expect(toggleBtn).toBeTruthy();
+
+    fireEvent.click(toggleBtn!);
+
+    listItems = container.querySelectorAll(".mmn-branch-list-item");
+    expect(listItems).toHaveLength(3); // Leaf A is hidden, so 3 items remain
+
+    fireEvent.keyDown(listItems[0]!, { key: "ArrowRight" });
+    expect(container.querySelectorAll(".mmn-branch-list-item")).toHaveLength(4);
   });
 });

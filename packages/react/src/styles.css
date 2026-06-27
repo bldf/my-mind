@@ -119,6 +119,16 @@
   scrollbar-width: thin;
 }
 
+.mmn-toolbar-stack {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  justify-self: end;
+  gap: 6px;
+  max-width: 100%;
+  min-width: 0;
+}
+
 .mmn-toolbar button {
   flex: 0 0 auto;
 }
@@ -923,6 +933,7 @@
 .mmn-branch-layout {
   display: grid;
   grid-template-columns: var(--mmn-branch-sidebar-width, 280px) 8px minmax(0, 1fr);
+  grid-template-rows: 100%;
   height: 100%;
   width: 100%;
   position: relative;
@@ -1136,6 +1147,11 @@
   background: var(--mmn-surface-muted);
 }
 
+.mmn-branch-list-item:focus-visible {
+  outline: 2px solid var(--mmn-selected);
+  outline-offset: 2px;
+}
+
 .mmn-branch-list-item--selected {
   background: var(--mmn-control-hover) !important;
   color: var(--mmn-selected);
@@ -1197,4 +1213,122 @@
   .mmn-editor--split-mode .mmn-branch-resize-handle {
     display: none !important;
   }
+}
+
+.mmn-toolbar {
+  overflow: visible !important;
+}
+
+/* Copy Dropdown Toolbar Styles */
+.mmn-toolbar__copy-container {
+  --mmn-copy-menu-min-width: 110px;
+  position: relative;
+  display: inline-block;
+}
+
+.mmn-toolbar__copy-container--open::after {
+  content: "";
+  position: absolute;
+  top: 100%;
+  right: 0;
+  width: max(100%, var(--mmn-copy-menu-min-width));
+  height: 4px;
+}
+
+.mmn-toolbar__copy-menu {
+  position: absolute;
+  top: 100%;
+  right: 0;
+  margin-top: 4px;
+  background: var(--mmn-surface);
+  border: 1px solid var(--mmn-border);
+  border-radius: 8px;
+  box-shadow: var(--mmn-shadow);
+  display: flex;
+  flex-direction: column;
+  padding: 4px;
+  min-width: var(--mmn-copy-menu-min-width);
+  z-index: 1000;
+}
+
+.mmn-toolbar__copy-menu button {
+  background: transparent;
+  border: 0;
+  padding: 6px 12px;
+  text-align: left;
+  font-size: 13px;
+  color: var(--mmn-node-text);
+  cursor: pointer;
+  border-radius: 6px;
+  width: 100%;
+  white-space: nowrap;
+  transition: background-color 120ms ease, color 120ms ease;
+  box-sizing: border-box;
+}
+
+.mmn-toolbar__copy-menu button:hover,
+.mmn-toolbar__copy-menu button:focus {
+  background: var(--mmn-control-hover);
+  color: var(--mmn-selected);
+  outline: none;
+}
+
+.mmn-toolbar__copy-status {
+  padding: 4px 8px;
+  border-radius: 6px;
+  background: color-mix(in srgb, var(--mmn-selected) 12%, var(--mmn-surface));
+  border: 1px solid color-mix(in srgb, var(--mmn-selected) 22%, var(--mmn-border));
+  color: var(--mmn-selected);
+  font-size: 12px;
+  font-weight: 600;
+  box-shadow: var(--mmn-shadow);
+  pointer-events: none;
+}
+
+/* Branch Tree Sidebar Panel Styles */
+.mmn-branch-tree-node-wrapper {
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+}
+
+.mmn-branch-tree-node-children {
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+}
+
+.mmn-branch-list-item__toggle {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 18px;
+  height: 18px;
+  border: 0;
+  background: transparent;
+  color: var(--mmn-muted-text);
+  cursor: pointer;
+  margin-right: 6px;
+  padding: 0;
+  border-radius: 4px;
+  flex-shrink: 0;
+  transition: background-color 120ms ease, color 120ms ease;
+}
+
+.mmn-branch-list-item__toggle:hover {
+  background: var(--mmn-surface-muted);
+  color: var(--mmn-node-text);
+}
+
+.mmn-branch-list-item__toggle-placeholder {
+  width: 18px;
+  margin-right: 6px;
+  flex-shrink: 0;
+  display: inline-block;
+}
+
+.mmn-branch-list-item--ancestor {
+  background: var(--mmn-surface-muted);
+  border-left: 2px solid var(--mmn-selected);
+  border-radius: 0 8px 8px 0;
 }

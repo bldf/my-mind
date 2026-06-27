@@ -271,7 +271,17 @@ export default function App() {
                 "zoomIn",
                 "fitView",
                 "export",
+                "copy",
               ],
+            }}
+            onCopyData={async ({ format, document }) => {
+              if (format === "json") return serializeDocument(document);
+              const result = await exportMindMap(document, format);
+              if (result.ok) {
+                return String(result.value);
+              } else {
+                return { ok: false, error: result.error };
+              }
             }}
             onChange={readonlyMode ? undefined : updateDocument}
             onError={(mindMapError) => setError(`${mindMapError.code}: ${mindMapError.message}`)}

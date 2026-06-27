@@ -181,16 +181,17 @@ export function useBranchListState({
   );
 
   const handleSelectBranch = useCallback(
-    (branchId: NodeId) => {
+    (nodeId: NodeId) => {
       const switchToken = branchSwitchTokenRef.current + 1;
       branchSwitchTokenRef.current = switchToken;
       clearBranchSwitchFrame();
       clearBranchSwitchTimeout();
       setBranchSwitchPending(true);
       pendingBranchViewportUpdateRef.current = true;
+      const branchId = getRootBranchIdForNode(document, nodeId) ?? nodeId;
       setSelectedBranchId(branchId);
-      setViewRootId(branchId);
-      onViewRootChange?.(branchId);
+      setViewRootId(nodeId);
+      onViewRootChange?.(nodeId);
       const ownerWindow = containerRef.current?.ownerDocument.defaultView ?? window;
       const isCurrentBranchSwitch = () =>
         branchSwitchTokenRef.current === switchToken &&
@@ -202,7 +203,7 @@ export function useBranchListState({
 
         pendingBranchViewportUpdateRef.current = false;
         const viewportOptions = {
-          waitForNodeId: branchId,
+          waitForNodeId: nodeId,
           maxWaitFrames: DEFAULT_VIEWPORT_UPDATE_WAIT_FRAMES * 4,
           shouldRun: isCurrentBranchSwitch,
           onSettled: () => {
@@ -245,6 +246,7 @@ export function useBranchListState({
       scheduleFit1to1View,
       scheduleFitView,
       viewportFitViewOnInit,
+      document,
     ],
   );
 

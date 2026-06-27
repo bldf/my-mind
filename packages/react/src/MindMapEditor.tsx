@@ -8,6 +8,7 @@ import {
   createEmptyDocument,
   dispatchCommand,
   getAncestorIds,
+  serializeDocument,
   simpleTreeLayout,
   type MindMapDocument,
   type MindMapError,
@@ -30,7 +31,7 @@ import { BezierEdge } from "./edges/BezierEdge";
 import { isSafeExternalUrl, openSafeExternalUrl } from "./link-utils";
 import { MindNode } from "./nodes/MindNode";
 import { resolveTheme, defaultThemes } from "./themes";
-import type { MindMapEditorProps, ViewToolbarControl } from "./types";
+import type { MindMapEditorProps, ViewToolbarControl, CopyDataFormat } from "./types";
 import { Breadcrumbs } from "./components/Breadcrumbs";
 import { InspectorPanel } from "./components/InspectorPanel";
 import { SearchPanel } from "./components/SearchPanel";
@@ -57,10 +58,10 @@ export { isTextInputActive } from "./editor-utils";
 const nodeTypes = { mindNode: MindNode };
 const edgeTypes = { mindBezier: BezierEdge };
 const DEFAULT_EDITABLE_TOOLBAR: ViewToolbarControl[] = [
-  "theme", "undo", "redo", "reset", "search", "inspector", "fullscreen", "zoomOut", "zoomIn", "fitView",
+  "theme", "undo", "redo", "reset", "search", "inspector", "fullscreen", "zoomOut", "zoomIn", "fitView", "copy",
 ];
 const DEFAULT_READONLY_TOOLBAR: ViewToolbarControl[] = [
-  "theme", "search", "fullscreen", "zoomOut", "zoomIn", "fitView",
+  "theme", "search", "fullscreen", "zoomOut", "zoomIn", "fitView", "copy",
 ];
 const CANVAS_MIN_ZOOM = 0.08;
 const CANVAS_MAX_ZOOM = 2;
@@ -101,8 +102,10 @@ function EditorCanvas(props: MindMapEditorProps) {
   const [searchOpen, setSearchOpen] = useState(false);
   const [inspectorOpen, setInspectorOpen] = useState(!props.inspector?.hidden);
   const [localTheme, setLocalTheme] = useState<MindMapTheme | undefined>(props.theme);
+  const [copiedFormat, setCopiedFormat] = useState<CopyDataFormat | null>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const didInitialFlowDataSync = useRef(false);
+  const copyStatusTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [flowNodes, setFlowNodes] = useState<MindFlowNode[]>([]);
   const [flowEdges, setFlowEdges] = useState<FlowConversionResult["edges"]>([]);
   const [prevFlowData, setPrevFlowData] = useState<FlowConversionResult | null>(null);
@@ -398,13 +401,80 @@ function EditorCanvas(props: MindMapEditorProps) {
   // --- Cleanup ---
   const lastAutoFitKey = useRef("");
   useEffect(() => {
-    return () => { clearFlashTimer(); clearFitViewFrame(); clearBranchSwitchFrame(); clearBranchSwitchTimeout(); };
+    return () => {
+      clearFlashTimer();
+      clearFitViewFrame();
+      clearBranchSwitchFrame();
+      clearBranchSwitchTimeout();
+      if (copyStatusTimerRef.current) clearTimeout(copyStatusTimerRef.current);
+    };
   }, [clearBranchSwitchFrame, clearBranchSwitchTimeout, clearFitViewFrame, clearFlashTimer]);
 
   // --- Nodes change ---
   const onNodesChange = useCallback<OnNodesChange<MindFlowNode>>((changes) => {
     setFlowNodes((currentNodes) => applyNodeChanges(changes, currentNodes));
   }, []);
+
+  // --- Copy action handler ---
+  const onCopyData = props.onCopyData;
+  const onCopySuccess = props.onCopySuccess;
+
+  const handleCopyAction = useCallback(
+    async (format: CopyDataFormat) => {
+      setCopiedFormat(null);
+      let text = "";
+      if (onCopyData) {
+        try {
+          const result = await onCopyData({ format, document });
+          if (typeof result === "string") {
+            text = result;
+          } else if (result && typeof result === "object") {
+            if (!result.ok) {
+              reportError(result.error);
+              return;
+            }
+            text = result.text;
+          }
+        } catch (err) {
+          reportError({
+            code: "COPY_FAILED",
+            message: err instanceof Error ? err.message : "Copy failed during callback execution",
+            recoverable: true,
+          });
+          return;
+        }
+      } else {
+        if (format === "json") {
+          text = serializeDocument(document);
+        } else {
+          reportError({
+            code: "COPY_NOT_CONFIGURED",
+            message: `Provide onCopyData callback to support ${format} format copy`,
+            recoverable: true,
+          });
+          return;
+        }
+      }
+
+      try {
+        await navigator.clipboard.writeText(text);
+        if (copyStatusTimerRef.current) clearTimeout(copyStatusTimerRef.current);
+        setCopiedFormat(format);
+        copyStatusTimerRef.current = setTimeout(() => {
+          setCopiedFormat(null);
+          copyStatusTimerRef.current = null;
+        }, 1600);
+        onCopySuccess?.(format);
+      } catch (err) {
+        reportError({
+          code: "CLIPBOARD_WRITE_FAILED",
+          message: err instanceof Error ? err.message : "Clipboard write permission denied or unavailable",
+          recoverable: true,
+        });
+      }
+    },
+    [document, onCopyData, onCopySuccess, reportError],
+  );
 
   // --- Toolbar & keyboard ---
   const onToolbarAction = useCallback(
@@ -481,7 +551,24 @@ function EditorCanvas(props: MindMapEditorProps) {
       {!props.breadcrumbs?.hidden || !props.toolbar?.hidden ? (
         <div className="mmn-editor__topbar">
           {!props.breadcrumbs?.hidden ? <Breadcrumbs document={document} viewRootId={effectiveViewRootId} onNavigate={enterViewRoot} /> : null}
-          {!props.toolbar?.hidden ? <Toolbar controls={controls} activeControls={activeControls} disabledControls={disabledControls} labels={toolbarLabels} onAction={onToolbarAction} /> : null}
+          {!props.toolbar?.hidden ? (
+            <div className="mmn-toolbar-stack">
+              <Toolbar
+                controls={controls}
+                activeControls={activeControls}
+                disabledControls={disabledControls}
+                labels={toolbarLabels}
+                onAction={onToolbarAction}
+                copyConfig={props.toolbar?.copy}
+                onCopyAction={handleCopyAction}
+              />
+              {copiedFormat ? (
+                <div className="mmn-toolbar__copy-status" role="status" aria-live="polite">
+                  Copied {copiedFormat.toUpperCase()}
+                </div>
+              ) : null}
+            </div>
+          ) : null}
         </div>
       ) : null}
       {Object.keys(document.nodes).length === 0 ? (
@@ -577,6 +664,7 @@ function EditorCanvas(props: MindMapEditorProps) {
               document={document}
               branchIds={rootBranchIds}
               selectedBranchId={selectedBranchId}
+              selectedNodeId={effectiveViewRootId}
               collapsed={sidebarCollapsed}
               previewOpen={sidebarPreviewOpen}
               pinned={sidebarPinned}
