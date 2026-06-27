@@ -1047,6 +1047,31 @@ test.describe("Branch List Focus Layout", () => {
     await expect(breadcrumbButtons.nth(1)).toContainText(secondTitle!);
   });
 
+  test("branch list shows a leaf child added from the canvas", async ({ page, isMobile }) => {
+    test.skip(isMobile, "Split layout side panel is hidden by default on mobile viewports.");
+
+    await page.goto("/");
+    await page.locator(".mmn-branch-toggle-btn").click();
+    await expect(page.locator(".mmn-branch-list-panel")).toBeVisible();
+
+    const topic2Item = page.locator('.mmn-branch-list-item[aria-level="1"]', {
+      hasText: "Topic 2",
+    });
+    await topic2Item.click();
+    await expect(topic2Item).toHaveClass(/mmn-branch-list-item--selected/);
+
+    const topic2Node = page.locator('.react-flow__node[data-id="node-2"]');
+    await expect(topic2Node.getByLabel("Title for Topic 2")).toBeVisible();
+    await topic2Node.hover();
+    await topic2Node.getByRole("button", { name: /^Add child to Topic 2$/ }).click();
+
+    await expect(
+      page.locator(".mmn-branch-list-panel").locator(".mmn-branch-list-item__title", {
+        hasText: "New child",
+      }),
+    ).toBeVisible();
+  });
+
   test("clicking branch list item recenters the selected subtree", async ({ page, isMobile }) => {
     test.skip(isMobile, "Split layout side panel is hidden by default on mobile viewports.");
 

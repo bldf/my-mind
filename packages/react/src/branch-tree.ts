@@ -32,38 +32,16 @@ export function buildBranchTreeItems(
 
     if (depth < maxDepth && hasDocumentChildren && !isFallbackParent) {
       const validChildren = node.children.filter((id) => document.nodes[id]);
-      if (depth === 1) {
-        const childrenWithSubchildren = validChildren.filter((id) => {
-          const childNode = document.nodes[id];
-          return childNode && Array.isArray(childNode.children) && childNode.children.length > 0;
-        });
-        if (childrenWithSubchildren.length > 0) {
-          for (const childId of childrenWithSubchildren) {
-            const t = buildTree(childId, 2);
-            if (t) childItems.push(t);
-          }
-        } else {
-          for (const childId of validChildren) {
-            const t = buildTree(childId, 2, true);
-            if (t) childItems.push(t);
-          }
-        }
-      } else if (depth === 2) {
-        const childrenWithSubchildren = validChildren.filter((id) => {
-          const childNode = document.nodes[id];
-          return childNode && Array.isArray(childNode.children) && childNode.children.length > 0;
-        });
-        if (childrenWithSubchildren.length > 0) {
-          for (const childId of childrenWithSubchildren) {
-            const t = buildTree(childId, 3);
-            if (t) childItems.push(t);
-          }
-        } else {
-          for (const childId of validChildren) {
-            const t = buildTree(childId, 3, true);
-            if (t) childItems.push(t);
-          }
-        }
+      const childrenWithSubchildren = validChildren.filter((id) => {
+        const childNode = document.nodes[id];
+        return childNode && Array.isArray(childNode.children) && childNode.children.length > 0;
+      });
+      const childDepth = (depth + 1) as 2 | 3;
+      const shouldUseFallbackLeaves = childrenWithSubchildren.length === 0;
+
+      for (const childId of validChildren) {
+        const t = buildTree(childId, childDepth, shouldUseFallbackLeaves);
+        if (t) childItems.push(t);
       }
     }
 

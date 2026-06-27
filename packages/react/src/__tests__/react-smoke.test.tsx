@@ -1267,6 +1267,35 @@ describe("@my-mind-node/react", () => {
     expect(screen.getByRole("button", { name: "Collapse single-count branches" })).toBeTruthy();
   });
 
+  it("updates the branch tree when adding a leaf child from the canvas", async () => {
+    function ControlledEditor() {
+      const [document, setDocument] = useState(createBranchExpansionCycleDocument());
+      return (
+        <MindMapEditor
+          value={document}
+          onChange={setDocument}
+          branchListLayout={{ defaultOpen: true }}
+        />
+      );
+    }
+
+    const getBranchTitles = (container: HTMLElement) => {
+      return Array.from(container.querySelectorAll(".mmn-branch-list-item__title")).map(
+        (element) => element.textContent,
+      );
+    };
+
+    const { container } = render(<ControlledEditor />);
+
+    expect(getBranchTitles(container)).toEqual(["Branch A", "Parent A"]);
+
+    fireEvent.keyDown(container.querySelector(".mmn-editor")!, { key: "Tab" });
+
+    await waitFor(() => {
+      expect(getBranchTitles(container)).toEqual(["Branch A", "Parent A", "New child"]);
+    });
+  });
+
   it("skips the compact branch tree expansion step when no parent has only single-count children", () => {
     const doc = createNoSingleCountCollapseDocument();
     const { container } = render(

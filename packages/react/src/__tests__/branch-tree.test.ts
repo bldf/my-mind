@@ -52,7 +52,7 @@ describe("branch-tree", () => {
     });
   });
 
-  it("keeps only parent level-2 nodes and filters out leaf level-2 nodes when parent exists", () => {
+  it("keeps leaf level-2 nodes visible alongside parent level-2 nodes", () => {
     const doc = createEmptyDocument();
     const rootId = doc.rootId;
 
@@ -76,15 +76,22 @@ describe("branch-tree", () => {
 
     const items = buildBranchTreeItems(doc);
     expect(items).toHaveLength(1);
-    expect(items[0]!.childItems).toHaveLength(1);
-    expect(items[0]!.childItems[0]!.nodeId).toBe(nodeC.id); // only nodeC, nodeB is filtered out
-    expect(items[0]!.childItems[0]!.childItems).toHaveLength(1);
-    expect(items[0]!.childItems[0]!.childItems[0]!).toEqual({
+    expect(items[0]!.childItems).toHaveLength(2);
+    expect(items[0]!.childItems[0]!).toEqual({
+      nodeId: nodeB.id,
+      depth: 2,
+      childItems: [],
+      hasDocumentChildren: false,
+      fallbackLeaf: undefined,
+    });
+    expect(items[0]!.childItems[1]!.nodeId).toBe(nodeC.id);
+    expect(items[0]!.childItems[1]!.childItems).toHaveLength(1);
+    expect(items[0]!.childItems[1]!.childItems[0]!).toEqual({
       nodeId: nodeD.id,
       depth: 3,
       childItems: [],
       hasDocumentChildren: false,
-      fallbackLeaf: true, // fallback leaf for level-2 nodeC
+      fallbackLeaf: true,
     });
   });
 });
