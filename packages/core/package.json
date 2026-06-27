@@ -1,6 +1,6 @@
 {
   "name": "@my-mind-node/core",
-  "version": "0.1.0-beta.3",
+  "version": "0.1.0-beta.4",
   "type": "module",
   "license": "MIT",
   "sideEffects": false,

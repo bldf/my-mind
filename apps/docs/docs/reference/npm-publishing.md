@@ -69,7 +69,7 @@ npm view @my-mind-node/exporters version --registry=https://registry.npmjs.org/
 ```
 
 For the next beta after `0.1.0-beta.0`, update all publishable package versions
-to `0.1.0-beta.3`:
+to `0.1.0-beta.4`:
 
 ```text
 packages/core/package.json

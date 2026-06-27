@@ -67,6 +67,51 @@ function createDeepBranchListDocument(): MindMapDocument {
   return doc;
 }
 
+function createBranchExpansionCycleDocument(): MindMapDocument {
+  const doc = createEmptyDocument({ rootTitle: "Root" });
+  const rootId = doc.rootId;
+  const branch = createNode({ id: asNodeId("branch-a"), parentId: rootId, title: "Branch A" });
+  const parent = createNode({ id: asNodeId("parent-a"), parentId: branch.id, title: "Parent A" });
+  const leaf = createNode({ id: asNodeId("leaf-a"), parentId: parent.id, title: "Leaf A" });
+
+  doc.nodes[rootId]!.children = [branch.id];
+  branch.children = [parent.id];
+  parent.children = [leaf.id];
+  doc.nodes[branch.id] = branch;
+  doc.nodes[parent.id] = parent;
+  doc.nodes[leaf.id] = leaf;
+  return doc;
+}
+
+function createTwoBranchExpansionCycleDocument(): MindMapDocument {
+  const doc = createBranchExpansionCycleDocument();
+  const rootId = doc.rootId;
+  const branch = createNode({ id: asNodeId("branch-b"), parentId: rootId, title: "Branch B" });
+  const parent = createNode({ id: asNodeId("parent-b"), parentId: branch.id, title: "Parent B" });
+  const leaf = createNode({ id: asNodeId("leaf-b"), parentId: parent.id, title: "Leaf B" });
+
+  doc.nodes[rootId]!.children.push(branch.id);
+  branch.children = [parent.id];
+  parent.children = [leaf.id];
+  doc.nodes[branch.id] = branch;
+  doc.nodes[parent.id] = parent;
+  doc.nodes[leaf.id] = leaf;
+  return doc;
+}
+
+function createNoSingleCountCollapseDocument(): MindMapDocument {
+  const doc = createBranchExpansionCycleDocument();
+  const child = createNode({
+    id: asNodeId("leaf-a-child"),
+    parentId: asNodeId("leaf-a"),
+    title: "Leaf A Child",
+  });
+
+  doc.nodes[asNodeId("leaf-a")]!.children = [child.id];
+  doc.nodes[child.id] = child;
+  return doc;
+}
+
 function renderMindNode(data: MindNodeData, selected = false) {
   const props = {
     id: String(data.node.id),
@@ -994,7 +1039,9 @@ describe("@my-mind-node/react", () => {
   it("enters split layout and switches branch without triggering onChange", async () => {
     const doc = createDeepBranchListDocument();
     const onChange = vi.fn();
-    const { container } = render(<MindMapEditor value={doc} onChange={onChange} branchListLayout={{ defaultOpen: true }} />);
+    const { container } = render(
+      <MindMapEditor value={doc} onChange={onChange} branchListLayout={{ defaultOpen: true }} />,
+    );
 
     // Click toggle button to exit split layout, then click it again to enter it
     const toggleBtn = container.querySelector(".mmn-branch-toggle-btn");
@@ -1009,12 +1056,12 @@ describe("@my-mind-node/react", () => {
 
     // By default first level-1 child is selected (Branch A)
     const listItems = container.querySelectorAll(".mmn-branch-list-item");
-    expect(listItems).toHaveLength(4);
+    expect(listItems).toHaveLength(2);
     expect(listItems[0]?.getAttribute("aria-current")).toBe("page");
 
-    // Click Branch B in list to switch (Branch B is index 2, Leaf A is index 1)
-    fireEvent.click(listItems[2]!);
-    expect(listItems[2]?.getAttribute("aria-current")).toBe("page");
+    // Click Branch B in list to switch
+    fireEvent.click(listItems[1]!);
+    expect(listItems[1]?.getAttribute("aria-current")).toBe("page");
 
     // Confirm that onChange was never called for this layout navigation
     expect(onChange).not.toHaveBeenCalled();
@@ -1144,24 +1191,108 @@ describe("@my-mind-node/react", () => {
     }
   });
 
-  it("opens the branch tree expanded after entering split layout from the toggle", () => {
+  it("opens the branch tree with single-count parents collapsed by default", () => {
     const doc = createDeepBranchListDocument();
     const { container } = render(<MindMapEditor value={doc} />);
 
     fireEvent.click(container.querySelector(".mmn-branch-toggle-btn")!);
 
     expect(container.querySelector(".mmn-branch-list-panel")).toBeTruthy();
-    expect(container.querySelectorAll(".mmn-branch-list-item")).toHaveLength(4);
+    expect(container.querySelectorAll(".mmn-branch-list-item")).toHaveLength(2);
+    expect(screen.getByRole("button", { name: "Expand all branches" })).toBeTruthy();
+  });
+
+  it("cycles branch tree expansion through default, expanded, compact, and collapsed states", () => {
+    const doc = createBranchExpansionCycleDocument();
+    const { container } = render(
+      <MindMapEditor value={doc} branchListLayout={{ defaultOpen: true }} />,
+    );
+
+    const getItems = () => container.querySelectorAll(".mmn-branch-list-item");
+    const getCountLabels = () => {
+      return Array.from(container.querySelectorAll(".mmn-branch-list-item__count")).map(
+        (element) => element.textContent,
+      );
+    };
+
+    expect(getItems()).toHaveLength(2);
+    expect(getCountLabels()).toEqual(["3", "2"]);
+
+    fireEvent.click(screen.getByRole("button", { name: "Expand all branches" }));
+    expect(getItems()).toHaveLength(3);
+    expect(getCountLabels()).toEqual(["3", "2"]);
+
+    fireEvent.click(screen.getByRole("button", { name: "Collapse single-count branches" }));
+    expect(getItems()).toHaveLength(2);
+
+    fireEvent.click(screen.getByRole("button", { name: "Collapse all branches" }));
+    expect(getItems()).toHaveLength(1);
+
+    fireEvent.click(screen.getByRole("button", { name: "Restore default branch expansion" }));
+    expect(getItems()).toHaveLength(2);
+  });
+
+  it("keeps expanded branch tree state synced when the document changes", () => {
+    const getBranchTitles = (container: HTMLElement) => {
+      return Array.from(container.querySelectorAll(".mmn-branch-list-item__title")).map(
+        (element) => element.textContent,
+      );
+    };
+
+    const { container, rerender } = render(
+      <MindMapEditor
+        value={createBranchExpansionCycleDocument()}
+        branchListLayout={{ defaultOpen: true }}
+      />,
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: "Expand all branches" }));
+    expect(getBranchTitles(container)).toEqual(["Branch A", "Parent A", "Leaf A"]);
+
+    rerender(
+      <MindMapEditor
+        value={createTwoBranchExpansionCycleDocument()}
+        branchListLayout={{ defaultOpen: true }}
+      />,
+    );
+
+    expect(getBranchTitles(container)).toEqual([
+      "Branch A",
+      "Parent A",
+      "Leaf A",
+      "Branch B",
+      "Parent B",
+      "Leaf B",
+    ]);
+    expect(screen.getByRole("button", { name: "Collapse single-count branches" })).toBeTruthy();
+  });
+
+  it("skips the compact branch tree expansion step when no parent has only single-count children", () => {
+    const doc = createNoSingleCountCollapseDocument();
+    const { container } = render(
+      <MindMapEditor value={doc} branchListLayout={{ defaultOpen: true }} />,
+    );
+
+    expect(container.querySelectorAll(".mmn-branch-list-item")).toHaveLength(3);
+    expect(screen.queryByRole("button", { name: "Expand all branches" })).toBeNull();
+
+    fireEvent.click(screen.getByRole("button", { name: "Collapse all branches" }));
+    expect(container.querySelectorAll(".mmn-branch-list-item")).toHaveLength(1);
+
+    fireEvent.click(screen.getByRole("button", { name: "Restore default branch expansion" }));
+    expect(container.querySelectorAll(".mmn-branch-list-item")).toHaveLength(3);
   });
 
   it("supports tree folding in the branch sidebar", () => {
     const doc = createDeepBranchListDocument();
-    const { container } = render(<MindMapEditor value={doc} branchListLayout={{ defaultOpen: true }} />);
+    const { container } = render(
+      <MindMapEditor value={doc} branchListLayout={{ defaultOpen: true }} />,
+    );
 
     expect(container.querySelector(".mmn-branch-list-panel")).toBeTruthy();
 
     let listItems = container.querySelectorAll(".mmn-branch-list-item");
-    expect(listItems).toHaveLength(4);
+    expect(listItems).toHaveLength(2);
 
     const toggleBtn = container.querySelector(".mmn-branch-list-item__toggle");
     expect(toggleBtn).toBeTruthy();
@@ -1169,9 +1300,9 @@ describe("@my-mind-node/react", () => {
     fireEvent.click(toggleBtn!);
 
     listItems = container.querySelectorAll(".mmn-branch-list-item");
-    expect(listItems).toHaveLength(3); // Leaf A is hidden, so 3 items remain
+    expect(listItems).toHaveLength(3); // Leaf A is visible under Branch A
 
-    fireEvent.keyDown(listItems[0]!, { key: "ArrowRight" });
-    expect(container.querySelectorAll(".mmn-branch-list-item")).toHaveLength(4);
+    fireEvent.keyDown(listItems[0]!, { key: "ArrowLeft" });
+    expect(container.querySelectorAll(".mmn-branch-list-item")).toHaveLength(2);
   });
 });

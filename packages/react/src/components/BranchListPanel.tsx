@@ -1,7 +1,15 @@
 import { useState, useMemo, useCallback, useEffect } from "react";
-import { getDescendantIds, getAncestorIds } from "@my-mind-node/core";
+import { getAncestorIds } from "@my-mind-node/core";
 import type { MindMapDocument, NodeId } from "@my-mind-node/core";
-import { PanelLeftClose, Pin, PinOff, ChevronDown, ChevronRight, ChevronsDown, ChevronsUp } from "lucide-react";
+import {
+  PanelLeftClose,
+  Pin,
+  PinOff,
+  ChevronDown,
+  ChevronRight,
+  ChevronsDown,
+  ChevronsUp,
+} from "lucide-react";
 import { AUTO_BRANCH_PALETTES, AUTO_BRANCH_PALETTES_DARK } from "../document-to-flow";
 import { buildBranchTreeItems, type BranchTreeItem } from "../branch-tree";
 
@@ -20,6 +28,40 @@ export interface BranchListPanelProps {
   onMouseLeave?: React.MouseEventHandler;
 }
 
+type BranchExpandCycleStep = "default" | "expanded" | "compact" | "collapsed";
+
+function getNodeTotalCounts(
+  document: MindMapDocument,
+  items: BranchTreeItem[],
+): Map<NodeId, number> {
+  const counts = new Map<NodeId, number>();
+
+  const countNode = (nodeId: NodeId): number => {
+    const cached = counts.get(nodeId);
+    if (cached !== undefined) return cached;
+
+    const node = document.nodes[nodeId];
+    if (!node) {
+      counts.set(nodeId, 1);
+      return 1;
+    }
+
+    let total = 1;
+    for (const childId of node.children) {
+      total += countNode(childId);
+    }
+    counts.set(nodeId, total);
+    return total;
+  };
+
+  const visit = (item: BranchTreeItem) => {
+    countNode(item.nodeId);
+    item.childItems.forEach(visit);
+  };
+  items.forEach(visit);
+  return counts;
+}
+
 function getExpandableNodeIds(items: BranchTreeItem[]): Set<NodeId> {
   const ids = new Set<NodeId>();
   const visit = (item: BranchTreeItem) => {
@@ -30,6 +72,58 @@ function getExpandableNodeIds(items: BranchTreeItem[]): Set<NodeId> {
   };
   items.forEach(visit);
   return ids;
+}
+
+function getDefaultExpandedNodeIds(
+  items: BranchTreeItem[],
+  nodeTotalCounts: Map<NodeId, number>,
+): Set<NodeId> {
+  const ids = new Set<NodeId>();
+  const visit = (item: BranchTreeItem) => {
+    if (item.childItems.length > 0) {
+      const allChildrenHaveSingleCount = item.childItems.every((child) => {
+        return (nodeTotalCounts.get(child.nodeId) ?? 1) === 1;
+      });
+      if (!allChildrenHaveSingleCount) {
+        ids.add(item.nodeId);
+      }
+      item.childItems.forEach(visit);
+    }
+  };
+  items.forEach(visit);
+  return ids;
+}
+
+function getExpansionCycleActionLabel(
+  step: BranchExpandCycleStep,
+  hasDefaultCollapsedParents: boolean,
+): string {
+  if (step === "default") {
+    return hasDefaultCollapsedParents ? "Expand all branches" : "Collapse all branches";
+  }
+  if (step === "expanded") {
+    return hasDefaultCollapsedParents ? "Collapse single-count branches" : "Collapse all branches";
+  }
+  if (step === "compact") return "Collapse all branches";
+  return "Restore default branch expansion";
+}
+
+function getExpandedNodeIdsForCycleStep(
+  step: BranchExpandCycleStep,
+  allExpandableNodeIds: Set<NodeId>,
+  defaultExpandedNodeIds: Set<NodeId>,
+): Set<NodeId> {
+  if (step === "expanded") return new Set(allExpandableNodeIds);
+  if (step === "collapsed") return new Set();
+  return new Set(defaultExpandedNodeIds);
+}
+
+function areNodeIdSetsEqual(left: Set<NodeId>, right: Set<NodeId>): boolean {
+  if (left.size !== right.size) return false;
+  for (const value of left) {
+    if (!right.has(value)) return false;
+  }
+  return true;
 }
 
 export function BranchListPanel({
@@ -50,10 +144,36 @@ export function BranchListPanel({
   const palettes = isDark ? AUTO_BRANCH_PALETTES_DARK : AUTO_BRANCH_PALETTES;
 
   const treeItems = useMemo(() => buildBranchTreeItems(document), [document]);
+  const nodeTotalCounts = useMemo(
+    () => getNodeTotalCounts(document, treeItems),
+    [document, treeItems],
+  );
+  const allExpandableNodeIds = useMemo(() => getExpandableNodeIds(treeItems), [treeItems]);
+  const defaultExpandedNodeIds = useMemo(
+    () => getDefaultExpandedNodeIds(treeItems, nodeTotalCounts),
+    [nodeTotalCounts, treeItems],
+  );
+  const hasDefaultCollapsedParents = defaultExpandedNodeIds.size < allExpandableNodeIds.size;
 
   const [expandedNodeIds, setExpandedNodeIds] = useState<Set<NodeId>>(() => {
-    return getExpandableNodeIds(buildBranchTreeItems(document));
+    const initialTreeItems = buildBranchTreeItems(document);
+    return getDefaultExpandedNodeIds(
+      initialTreeItems,
+      getNodeTotalCounts(document, initialTreeItems),
+    );
   });
+  const [expandCycleStep, setExpandCycleStep] = useState<BranchExpandCycleStep>("default");
+
+  useEffect(() => {
+    const nextExpandedNodeIds = getExpandedNodeIdsForCycleStep(
+      expandCycleStep,
+      allExpandableNodeIds,
+      defaultExpandedNodeIds,
+    );
+    setExpandedNodeIds((prev) => {
+      return areNodeIdSetsEqual(prev, nextExpandedNodeIds) ? prev : nextExpandedNodeIds;
+    });
+  }, [allExpandableNodeIds, defaultExpandedNodeIds, expandCycleStep]);
 
   // Auto-expand ancestors of selectedNodeId so the selected node is visible in the tree
   useEffect(() => {
@@ -75,13 +195,43 @@ export function BranchListPanel({
     }
   }, [selectedNodeId, document]);
 
-  const expandAll = useCallback(() => {
-    setExpandedNodeIds(getExpandableNodeIds(treeItems));
-  }, [treeItems]);
+  const cycleBranchExpansion = useCallback(() => {
+    if (expandCycleStep === "default") {
+      if (hasDefaultCollapsedParents) {
+        setExpandedNodeIds(new Set(allExpandableNodeIds));
+        setExpandCycleStep("expanded");
+      } else {
+        setExpandedNodeIds(new Set());
+        setExpandCycleStep("collapsed");
+      }
+      return;
+    }
 
-  const collapseAll = useCallback(() => {
-    setExpandedNodeIds(new Set());
-  }, []);
+    if (expandCycleStep === "expanded") {
+      if (hasDefaultCollapsedParents) {
+        setExpandedNodeIds(new Set(defaultExpandedNodeIds));
+        setExpandCycleStep("compact");
+      } else {
+        setExpandedNodeIds(new Set());
+        setExpandCycleStep("collapsed");
+      }
+      return;
+    }
+
+    if (expandCycleStep === "compact") {
+      setExpandedNodeIds(new Set());
+      setExpandCycleStep("collapsed");
+      return;
+    }
+
+    setExpandedNodeIds(new Set(defaultExpandedNodeIds));
+    setExpandCycleStep("default");
+  }, [
+    allExpandableNodeIds,
+    defaultExpandedNodeIds,
+    expandCycleStep,
+    hasDefaultCollapsedParents,
+  ]);
 
   const toggleCollapse = useCallback((nodeId: NodeId) => {
     setExpandedNodeIds((prev) => {
@@ -106,8 +256,8 @@ export function BranchListPanel({
     const hasChildren = item.childItems.length > 0;
     const isExpanded = expandedNodeIds.has(item.nodeId);
 
-    const descendantCount = getDescendantIds(document, item.nodeId).length;
-    const totalNodes = 1 + descendantCount;
+    const totalNodes = nodeTotalCounts.get(item.nodeId) ?? 1;
+    const showCount = totalNodes > 1;
 
     let swatchColor = "#758195";
     if (item.depth === 1) {
@@ -184,7 +334,7 @@ export function BranchListPanel({
             />
           )}
           <span className="mmn-branch-list-item__title">{node.title}</span>
-          <span className="mmn-branch-list-item__count">{totalNodes}</span>
+          {showCount ? <span className="mmn-branch-list-item__count">{totalNodes}</span> : null}
         </div>
 
         {hasChildren && isExpanded && (
@@ -195,6 +345,13 @@ export function BranchListPanel({
       </div>
     );
   };
+
+  const expansionActionLabel = getExpansionCycleActionLabel(
+    expandCycleStep,
+    hasDefaultCollapsedParents,
+  );
+  const ExpansionActionIcon =
+    expansionActionLabel.startsWith("Collapse") ? ChevronsUp : ChevronsDown;
 
   return (
     <aside
@@ -214,20 +371,11 @@ export function BranchListPanel({
           <button
             type="button"
             className="mmn-branch-list-panel__action-btn"
-            title="Expand all"
-            aria-label="Expand all"
-            onClick={expandAll}
+            title={expansionActionLabel}
+            aria-label={expansionActionLabel}
+            onClick={cycleBranchExpansion}
           >
-            <ChevronsDown size={16} />
-          </button>
-          <button
-            type="button"
-            className="mmn-branch-list-panel__action-btn"
-            title="Collapse all"
-            aria-label="Collapse all"
-            onClick={collapseAll}
-          >
-            <ChevronsUp size={16} />
+            <ExpansionActionIcon size={16} />
           </button>
           {(!pinned || previewOpen) && (
             <button

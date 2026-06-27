@@ -116,7 +116,7 @@ export function buildBranchTreeItems(
 
 ### 模块 4: BranchListPanel Tree 渲染
 
-`BranchListPanel` 接收 `items: BranchTreeItem[]`，用递归或扁平化渲染默认展开 Tree。组件仍负责视觉和点击，不负责构建规则。
+`BranchListPanel` 接收或内部 memoize `BranchTreeItem[]`，用递归或扁平化渲染紧凑默认展开 Tree。组件负责视觉、点击和本地展开状态，不负责改变 `MindMapDocument`。
 
 建议结构:
 
@@ -134,7 +134,10 @@ interface BranchListPanelProps {
 
 - 外层 `nav` 使用 `aria-label="Branch tree"`。
 - Tree 容器使用 `role="tree"`；每行使用 `role="treeitem"` 和 `aria-level={item.depth}`。
-- 默认展开，不需要交互式 disclosure 状态；有 childItems 的行可以显示 `ChevronDown` 或类似父节点提示图标。
+- 默认紧凑展开：只要某父项的所有可见子项都是单节点终点，该父项默认折叠；仍有下钻信息的父级路径默认展开。
+- 有 `childItems` 的行显示 `ChevronDown` / `ChevronRight` disclosure，可通过鼠标或 `ArrowLeft` / `ArrowRight` 切换本地展开状态。
+- panel header 提供单一展开循环按钮，按 `default -> expanded -> compact -> collapsed -> default` 切换；若默认态已等同全部展开，则跳过 compact 语义并在 `default -> collapsed -> default` 间切换。
+- 当 `document` 变化导致 `BranchTreeItem` 结构变化时，当前循环状态重新映射到新的 expandable ids：`expanded` 覆盖所有新可展开项，`collapsed` 保持全收起，`default` / `compact` 使用最新默认紧凑集合。
 - 缩进使用 CSS 自定义属性或 depth class，如 `.mmn-branch-tree-item--depth-2`。
 - 一级 item 保留现有 swatch 和分支总数，二/三级 item 使用更轻的父节点标识和子节点数量。
 - 当前 `effectiveViewRootId` 精确匹配的 item 使用 `aria-current="page"`；其一级祖先可加 `.mmn-branch-tree-item--ancestor`。
