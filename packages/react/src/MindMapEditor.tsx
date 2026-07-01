@@ -8,6 +8,7 @@ import {
   createEmptyDocument,
   dispatchCommand,
   getAncestorIds,
+  getVisibleNodeIds,
   serializeDocument,
   simpleTreeLayout,
   type MindMapDocument,
@@ -323,10 +324,14 @@ function EditorCanvas(props: MindMapEditorProps) {
   );
   const onTitleCommit = useCallback(
     (nodeId: NodeId, title: string) => {
-      runCommand({ type: "node.update", nodeId, patch: { title }, meta: { source: "canvas", label: "Rename node" } });
+      const shouldRelayout = getVisibleNodeIds(document).length > 1;
+      runCommand(
+        { type: "node.update", nodeId, patch: { title }, meta: { source: "canvas", label: "Rename node" } },
+        { autoLayout: shouldRelayout },
+      );
       flushPendingViewportUpdate();
     },
-    [flushPendingViewportUpdate, runCommand],
+    [document, flushPendingViewportUpdate, runCommand],
   );
 
   // --- Flow data ---

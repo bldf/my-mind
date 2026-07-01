@@ -137,6 +137,7 @@ export const MindNode = memo(function MindNode(props: NodeProps) {
   const editableTitleClassName = [
     "mmn-node__title",
     "mmn-node__title--editable",
+    "nodrag",
     link ? "mmn-node__title--link" : "",
     editableTitleRows > 1 ? "mmn-node__title--multiline" : "",
   ]

@@ -116,22 +116,6 @@ async function dispatchPinchLikeWheel(
   });
 }
 
-async function expectNodeInsideCanvas(page: import("@playwright/test").Page, nodeId: string) {
-  await expect
-    .poll(async () => {
-      const node = await getNodeBox(page, nodeId);
-      const canvas = await page.locator(".react-flow").boundingBox();
-      if (!canvas) return false;
-      return (
-        node.box.x >= canvas.x &&
-        node.box.y >= canvas.y &&
-        node.box.x + node.box.width <= canvas.x + canvas.width &&
-        node.box.y + node.box.height <= canvas.y + canvas.height
-      );
-    })
-    .toBe(true);
-}
-
 async function expectVisibleNodesCenteredInCanvas(
   page: import("@playwright/test").Page,
   maxDelta = 48,
@@ -304,8 +288,9 @@ test("ordinary wheel input over an editable node title still pans the viewport",
   test.skip(isMobile, "Desktop wheel input is covered separately from mobile touch basics.");
 
   await page.goto("/");
+  await loadSingleNodeResizeDocument(page);
   await waitForViewportSettled(page);
-  const node = await getNodeBox(page, "node-1");
+  const node = await getNodeBox(page, "resize-root");
   const title = node.locator.locator("textarea");
   const titleBox = await title.boundingBox();
   if (!titleBox) throw new Error("Node title textarea is not visible");
@@ -324,6 +309,47 @@ test("ordinary wheel input over an editable node title still pans the viewport",
   expect(afterViewport.zoom).toBeCloseTo(beforeViewport.zoom, 5);
   expect(afterViewport.x).toBeLessThan(beforeViewport.x);
   expect(afterViewport.y).toBeLessThan(beforeViewport.y);
+});
+
+test("dragging inside an editable node title does not move the node", async ({
+  page,
+  isMobile,
+}) => {
+  test.skip(
+    isMobile,
+    "Desktop mouse text selection is covered separately from mobile touch basics.",
+  );
+
+  await page.goto("/");
+  await loadSingleNodeResizeDocument(page);
+  await waitForViewportSettled(page);
+  const root = await getNodeBox(page, "resize-root");
+  const title = root.locator.locator("textarea");
+  await title.click();
+  await expect.poll(() => title.evaluate((element) => getComputedStyle(element).userSelect)).toBe(
+    "text",
+  );
+
+  const beforeBox = await root.locator.boundingBox();
+  const titleBox = await title.boundingBox();
+  if (!beforeBox || !titleBox) throw new Error("Editable title is not visible");
+  const beforeViewport = await getViewportTransform(page);
+
+  await title.evaluate((element) => {
+    (element as HTMLTextAreaElement).setSelectionRange(0, 0);
+  });
+  await page.mouse.move(titleBox.x + 8, titleBox.y + titleBox.height / 2);
+  await page.mouse.down();
+  await page.mouse.move(titleBox.x + titleBox.width - 8, titleBox.y + titleBox.height / 2, {
+    steps: 8,
+  });
+  await page.mouse.up();
+
+  const afterBox = await root.locator.boundingBox();
+  if (!afterBox) throw new Error("Root node moved out of view");
+  expect(Math.round(afterBox.x)).toBe(Math.round(beforeBox.x));
+  expect(Math.round(afterBox.y)).toBe(Math.round(beforeBox.y));
+  expect(await getViewportTransform(page)).toBe(beforeViewport);
 });
 
 test("pinch-like wheel deltas zoom smoothly around the pointer", async ({ page, isMobile }) => {
@@ -955,7 +981,7 @@ test("dragging corner resize handle scales the node 1:1 and commits once", async
     .toBe(beforeScale);
 });
 
-test("multiline and long titles are saved and keep the root fully visible", async ({
+test("multiline and long titles are saved without recentering the viewport", async ({
   page,
   isMobile,
 }) => {
@@ -965,10 +991,12 @@ test("multiline and long titles are saved and keep the root fully visible", asyn
   );
 
   await page.goto("/");
+  await waitForViewportSettled(page);
   const root = page.locator('.react-flow__node[data-id="node-0"]');
   const title = root.getByLabel(/^Title for 100 node map$/);
   const nextTitle =
-    "100 node map\nwith a long root title that should remain fully visible after editing";
+    "100 node map\nwith a long root title that should not recenter after editing";
+  const beforeViewport = await getViewportTransform(page);
 
   await title.fill(nextTitle);
   await page.getByRole("button", { name: "Themes" }).focus();
@@ -977,7 +1005,7 @@ test("multiline and long titles are saved and keep the root fully visible", asyn
     .poll(async () => (await getPlaygroundDocument(page)).nodes["node-0"]?.title)
     .toBe(nextTitle);
   await expect(root.locator("textarea")).toHaveValue(nextTitle);
-  await expectNodeInsideCanvas(page, "node-0");
+  await expect.poll(async () => getViewportTransform(page)).toBe(beforeViewport);
 });
 
 test.describe("Branch List Focus Layout", () => {

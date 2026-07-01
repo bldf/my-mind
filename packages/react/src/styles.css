@@ -239,7 +239,11 @@
 .mmn-node__title--editable {
   resize: none;
   overflow: hidden;
+  cursor: text;
   font-family: inherit;
+  -webkit-user-select: text;
+  -moz-user-select: text;
+  user-select: text;
 }
 
 .mmn-node__title--readonly {

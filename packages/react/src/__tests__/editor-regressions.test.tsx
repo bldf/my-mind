@@ -249,4 +249,19 @@ describe("MindMapEditor regression coverage", () => {
     await waitFor(() => expect(fakeFlowState.setViewport).toHaveBeenCalled());
     expect(fakeFlowState.setViewport).toHaveBeenLastCalledWith({ x: -650, y: 275, zoom: 1 });
   });
+
+  it("does not recenter the viewport after title edits relayout the tree", async () => {
+    render(<MindMapEditor value={createPositionedDocument()} viewport={{ fitViewOnInit: true }} />);
+    const rootTitle = await screen.findByLabelText("Title for Root");
+    fakeFlowState.fitView.mockClear();
+    fakeFlowState.setViewport.mockClear();
+
+    fireEvent.change(rootTitle, {
+      target: { value: "Root with a much longer title that should relayout children" },
+    });
+    fireEvent.blur(rootTitle);
+
+    expect(fakeFlowState.fitView).not.toHaveBeenCalled();
+    expect(fakeFlowState.setViewport).not.toHaveBeenCalled();
+  });
 });

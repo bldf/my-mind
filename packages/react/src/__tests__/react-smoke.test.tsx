@@ -1,9 +1,11 @@
 import { act, cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import {
+  applyLayoutResult,
   asNodeId,
   createEmptyDocument,
   createNode,
+  simpleTreeLayout,
   type MindMapDocument,
   type MindMapNode,
 } from "@my-mind-node/core";
@@ -540,6 +542,14 @@ describe("@my-mind-node/react", () => {
     expect(onOpenLink).not.toHaveBeenCalled();
   });
 
+  it("marks editable title textareas as non-draggable canvas controls", () => {
+    const node = createNode({ id: asNodeId("first"), title: "First" });
+    renderMindNode({ node });
+
+    const classNames = screen.getByLabelText("Title for First").className.split(/\s+/);
+    expect(classNames).toContain("nodrag");
+  });
+
   it("opens link data from the editable title textarea when clicked with meta/ctrl key", () => {
     const node = createNode({
       id: asNodeId("first"),
@@ -831,7 +841,7 @@ describe("@my-mind-node/react", () => {
     expect(nextDocument.nodes[nextDocument.rootId]!.title).toBe("Line one\nLine two");
   });
 
-  it("does not relayout node positions when editing a title", () => {
+  it("keeps single-node positions stable when editing a title", () => {
     const document = createEmptyDocument({ rootTitle: "Root" });
     document.nodes[document.rootId]!.position = { x: 42, y: -18 };
     const onChange = vi.fn();
@@ -845,6 +855,41 @@ describe("@my-mind-node/react", () => {
 
     const nextDocument = onChange.mock.calls.at(-1)?.[0] as MindMapDocument;
     expect(nextDocument.nodes[nextDocument.rootId]!.position).toEqual({ x: 42, y: -18 });
+  });
+
+  it("relayouts node positions when editing a title in a visible tree", () => {
+    const baseDocument = createDocumentWithRootChildren();
+    const document = applyLayoutResult(baseDocument, simpleTreeLayout(baseDocument));
+    const longTitle = "Root with a much longer title that should push children away";
+    const onChange = vi.fn();
+    render(<MindMapEditor value={document} onChange={onChange} />);
+
+    const title = screen.getByLabelText("Title for Root");
+    fireEvent.change(title, { target: { value: longTitle } });
+    fireEvent.blur(title);
+
+    const expectedLayoutInput: MindMapDocument = {
+      ...document,
+      nodes: {
+        ...document.nodes,
+        [document.rootId]: {
+          ...document.nodes[document.rootId]!,
+          title: longTitle,
+        },
+      },
+    };
+    const expectedDocument = applyLayoutResult(
+      expectedLayoutInput,
+      simpleTreeLayout(expectedLayoutInput),
+    );
+    const nextDocument = onChange.mock.calls.at(-1)?.[0] as MindMapDocument;
+
+    expect(nextDocument.nodes[document.rootId]!.position).toEqual(
+      expectedDocument.nodes[document.rootId]!.position,
+    );
+    expect(nextDocument.nodes.first!.position).toEqual(expectedDocument.nodes.first!.position);
+    expect(nextDocument.nodes.second!.position).toEqual(expectedDocument.nodes.second!.position);
+    expect(nextDocument.nodes.first!.position).not.toEqual(document.nodes.first!.position);
   });
 
   it("handles continuous 1:1 dragging and commits the scale value on release", () => {
