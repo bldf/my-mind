@@ -26,7 +26,7 @@ git diff HEAD
 ### 2. 第 1 轮审查：代码质量
 
 逐文件检查：
-- **风格一致性**: 对照 `.antigravity/rules/coding-style.md`
+- **风格一致性**: 对照 `.agents/rules/coding-style.md`
 - **类型安全**: 是否有 any、类型断言过多、缺少类型定义
 - **逻辑正确性**: 边界条件、空值处理、错误处理
 - **命名规范**: 变量/函数/组件命名是否清晰
@@ -42,7 +42,7 @@ git diff HEAD
 
 ### 4. 安全扫描
 
-读取 `.antigravity/rules/security.md`，逐项扫描：
+读取 `.agents/rules/security.md`，逐项扫描：
 
 **必检项：**
 - [ ] 硬编码的密钥、Token、密码、API Key

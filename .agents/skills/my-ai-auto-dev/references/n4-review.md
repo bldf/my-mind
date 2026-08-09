@@ -6,7 +6,7 @@
 
 检查本 task 变更的：
 
-- 代码质量：命名、结构、可读性、是否符合 `.antigravity/rules/`
+- 代码质量：命名、结构、可读性、是否符合 `.agents/rules/`
 - 逻辑正确性：边界条件、错误处理、并发安全
 - 安全性：硬编码密钥、`.env` 误入 git、注入漏洞、OWASP Top 10
 - 性能：N+1 查询、不必要的重复计算、内存泄漏风险
@@ -17,7 +17,7 @@
 
 自审通过后，必须调用 `code-review-and-quality` skill：
 
-- 使用当前 Antigravity 环境中可用的 `code-review-and-quality` skill；不要硬编码用户级绝对路径
+- 使用当前 agents 环境中可用的 `code-review-and-quality` skill；不要硬编码用户级绝对路径
 - review 输入限定为**本 task 涉及的变更文件 diff**（不是整个 working tree）
 - review 前重新读取当前 task、requirements.md、design.md、tasks.md、相关项目规则和验证结果
 - 按 skill 要求覆盖 correctness、readability、architecture、security、performance、verification

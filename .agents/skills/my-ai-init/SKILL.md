@@ -1,11 +1,11 @@
 ---
 name: my-ai-init
-description: Initialize or refresh Antigravity project guidance for a repository by analyzing its stack and creating AGENTS.md plus .antigravity/rules/*. Use when the user asks to initialize Antigravity guidance, generate project rules, migrate /my:init, or set up AGENTS.md and repo-specific rules.
+description: Initialize or refresh agents project guidance for a repository by analyzing its stack and creating AGENTS.md plus .agents/rules/*. Use when the user asks to initialize agents guidance, generate project rules, migrate /my:init, or set up AGENTS.md and repo-specific rules.
 ---
 
-# My AI Init - 项目 Antigravity 初始化
+# My AI Init - 项目 agents 初始化
 
-你是一个项目配置初始化助手。你的任务是在当前项目目录中创建 Antigravity 可用的项目指导文件及其完整规则结构。
+你是一个项目配置初始化助手。你的任务是在当前项目目录中创建 agents 可用的项目指导文件及其完整规则结构。
 
 ## 执行步骤
 
@@ -23,8 +23,8 @@ description: Initialize or refresh Antigravity project guidance for a repository
 根据分析结果，生成以下结构（只创建与项目相关的文件）：
 
 ```text
-AGENTS.md                         # Antigravity 项目门面，<=150 行
-.antigravity/
+AGENTS.md                         # agents 项目门面，<=150 行
+.agents/
 └── rules/
     ├── coding-style.md           # 命名/缩进/import/注释规范
     ├── testing.md                # 测试约定、覆盖率要求
@@ -65,17 +65,17 @@ AGENTS.md                         # Antigravity 项目门面，<=150 行
 
 ## 项目规则
 
-Antigravity 执行任务前应读取：
+agents 执行任务前应读取：
 
-- `.antigravity/rules/coding-style.md`
-- `.antigravity/rules/testing.md`
-- `.antigravity/rules/security.md`
-- `.antigravity/rules/git-workflow.md`
+- `.agents/rules/coding-style.md`
+- `.agents/rules/testing.md`
+- `.agents/rules/security.md`
+- `.agents/rules/git-workflow.md`
 {以下按需引入}
-- `.antigravity/rules/frontend.md`
-- `.antigravity/rules/backend-api.md`
-- `.antigravity/rules/database.md`
-- `.antigravity/rules/smart-contract.md`
+- `.agents/rules/frontend.md`
+- `.agents/rules/backend-api.md`
+- `.agents/rules/database.md`
+- `.agents/rules/smart-contract.md`
 ```
 
 ### 4. rules 文件格式
@@ -106,7 +106,7 @@ globs: {可选，如 "src/web/**"}
 
 ## 重要约束
 
-- 如果 `AGENTS.md` 或 `.antigravity/rules/` 中的目标规则文件已存在，先告知用户并询问是否覆盖
+- 如果 `AGENTS.md` 或 `.agents/rules/` 中的目标规则文件已存在，先告知用户并询问是否覆盖
 - 所有规则内容必须基于项目实际情况推断，不要生成空洞的通用规则
 - `AGENTS.md` 严格控制在 150 行以内
 - 只创建与项目实际相关的 rules 文件，不要创建不适用的文件

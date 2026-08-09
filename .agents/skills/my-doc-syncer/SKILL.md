@@ -1,6 +1,6 @@
 ---
 name: my-doc-syncer
-description: 文档同步 Skill，开发完成后自动更新 README、.antigravity/ 配置、specs CHANGELOG，保持文档与代码一致
+description: 文档同步 Skill，开发完成后自动更新 README、.agents/ 配置、specs CHANGELOG，保持文档与代码一致
 ---
 
 # my-doc-syncer — 文档同步器
@@ -58,7 +58,7 @@ description: 文档同步 Skill，开发完成后自动更新 README、.antigrav
 - 引入了新技术栈 → 更新「技术栈」
 - 新增了 rules 文件 → 更新引用列表
 
-### 4. 更新 .antigravity/rules/
+### 4. 更新 .agents/rules/
 
 检查变更中是否出现了新的模式或约定：
 

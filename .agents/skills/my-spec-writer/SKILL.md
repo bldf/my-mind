@@ -27,7 +27,7 @@ description: 将需求文档解析为结构化的 requirements.md、design.md、
 ### 2. 读取项目上下文
 
 - 读取 `AGENTS.md` 了解项目技术栈
-- 读取 `.antigravity/rules/` 下所有规则文件，了解编码规范
+- 读取 `.agents/rules/` 下所有规则文件，了解编码规范
 - 根据 `ARCH_TYPE` 扫描对应目录结构，了解现有模块划分
 - 检查 `specs/` 目录下是否有已有的 feature specs
 
@@ -87,7 +87,7 @@ specs/{feature-name}/
 
 ### 7. 生成 design.md
 
-读取 `.antigravity/rules/` 确保设计方案符合项目规范。必须包含架构信息：
+读取 `.agents/rules/` 确保设计方案符合项目规范。必须包含架构信息：
 
 ```markdown
 # {Feature 名称} — 技术设计

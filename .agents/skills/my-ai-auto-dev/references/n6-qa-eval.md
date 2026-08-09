@@ -1,6 +1,6 @@
 # N6: QA 评估
 
-Antigravity 动态决策是否触发 QA，不按固定间隔。
+agents 动态决策是否触发 QA，不按固定间隔。
 
 ## 评分（1-5 分，总分 >= 8 触发）
 
@@ -32,4 +32,4 @@ Antigravity 动态决策是否触发 QA，不按固定间隔。
    累积变更: {N} 个 task | 风险评估: {总分}
 ```
 
-优先使用项目已安装的 `my-qa-engineer` skill 或 Antigravity 可用的浏览器/测试工具。QA 通过 -> 继续。发现问题 -> 修复后重新 QA，最多 3 轮。
+优先使用项目已安装的 `my-qa-engineer` skill 或 agents 可用的浏览器/测试工具。QA 通过 -> 继续。发现问题 -> 修复后重新 QA，最多 3 轮。

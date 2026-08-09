@@ -24,7 +24,7 @@ description: 数据库工程师 Skill，执行数据模型设计、migration、�
 
 ### 2. 读取上下文
 
-- `.antigravity/rules/database.md`、`.antigravity/rules/security.md`（如存在）
+- `.agents/rules/database.md`、`.agents/rules/security.md`（如存在）
 - design.md 中的数据模型和接口契约
 - 现有 schema/model 文件
 

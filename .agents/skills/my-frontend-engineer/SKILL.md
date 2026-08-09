@@ -5,7 +5,7 @@ description: 前端工程师 Skill，执行前端开发任务，自动适配项�
 
 # my-frontend-engineer — 前端工程师
 
-执行前端开发任务。自动识别项目技术栈，遵循项目 `.antigravity/rules/` 中的规范。
+执行前端开发任务。自动识别项目技术栈，遵循项目 `.agents/rules/` 中的规范。
 
 ## 触发条件
 
@@ -39,7 +39,7 @@ description: 前端工程师 Skill，执行前端开发任务，自动适配项�
 
 ### 2. 读取上下文
 
-- `.antigravity/rules/frontend.md`、`.antigravity/rules/coding-style.md`（如存在）
+- `.agents/rules/frontend.md`、`.agents/rules/coding-style.md`（如存在）
 - design.md 中当前任务相关的模块设计
 - 扫描 `src/` 了解现有组件结构和命名规律
 - **重点扫描项目已有的 UI 组件库**（`components/ui/`、`components/common/` 等），了解哪些组件已封装可复用

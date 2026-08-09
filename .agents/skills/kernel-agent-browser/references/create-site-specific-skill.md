@@ -7,7 +7,7 @@ This guide walks through creating website automation skills using agent-browser 
 **Use the website's domain as the skill folder name:**
 
 ```
-.antigravity/skills/<domain>/SKILL.md
+.agents/skills/<domain>/SKILL.md
 ```
 
 Examples:
@@ -275,7 +275,7 @@ agent-browser -p kernel close
 
 User request: "Create a skill for example.com to check my account balance"
 
-1. **Create skill folder**: `.antigravity/skills/example.com/`
+1. **Create skill folder**: `.agents/skills/example.com/`
 
 2. **Start browser and explore**:
    ```bash

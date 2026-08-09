@@ -31,8 +31,8 @@ The CLI enforces read-before-act. You cannot `type` or `keys` to a pane unless y
 3. After a successful `type`/`keys`, the mark is cleared — you must read again before the next interaction
 
 ```
-$ tmux-bridge type antigravity "hello"
-error: must read the pane before interacting. Run: tmux-bridge read antigravity
+$ tmux-bridge type agents "hello"
+error: must read the pane before interacting. Run: tmux-bridge read agents
 ```
 
 ### Command Reference
@@ -40,12 +40,12 @@ error: must read the pane before interacting. Run: tmux-bridge read antigravity
 | Command | Description | Example |
 |---|---|---|
 | `tmux-bridge list` | Show all panes with target, pid, command, size, label | `tmux-bridge list` |
-| `tmux-bridge type <target> <text>` | Type text without pressing Enter | `tmux-bridge type antigravity "hello"` |
-| `tmux-bridge message <target> <text>` | Type text with auto sender info and reply target | `tmux-bridge message antigravity "review src/auth.ts"` |
-| `tmux-bridge read <target> [lines]` | Read last N lines (default 50) | `tmux-bridge read antigravity 100` |
-| `tmux-bridge keys <target> <key>...` | Send special keys | `tmux-bridge keys antigravity Enter` |
-| `tmux-bridge name <target> <label>` | Label a pane (visible in tmux border) | `tmux-bridge name %3 antigravity` |
-| `tmux-bridge resolve <label>` | Print pane target for a label | `tmux-bridge resolve antigravity` |
+| `tmux-bridge type <target> <text>` | Type text without pressing Enter | `tmux-bridge type agents "hello"` |
+| `tmux-bridge message <target> <text>` | Type text with auto sender info and reply target | `tmux-bridge message agents "review src/auth.ts"` |
+| `tmux-bridge read <target> [lines]` | Read last N lines (default 50) | `tmux-bridge read agents 100` |
+| `tmux-bridge keys <target> <key>...` | Send special keys | `tmux-bridge keys agents Enter` |
+| `tmux-bridge name <target> <label>` | Label a pane (visible in tmux border) | `tmux-bridge name %3 agents` |
+| `tmux-bridge resolve <label>` | Print pane target for a label | `tmux-bridge resolve agents` |
 | `tmux-bridge id` | Print this pane's ID | `tmux-bridge id` |
 
 ### Target Resolution
@@ -60,12 +60,12 @@ Every interaction follows **read → act → read**. The CLI enforces this.
 
 **Sending a message to an agent:**
 ```bash
-tmux-bridge read antigravity 20                    # 1. READ — satisfy read guard
-tmux-bridge message antigravity 'Please review src/auth.ts'
+tmux-bridge read agents 20                    # 1. READ — satisfy read guard
+tmux-bridge message agents 'Please review src/auth.ts'
                                               # 2. MESSAGE — auto-prepends sender info, no Enter
-tmux-bridge read antigravity 20                    # 3. READ — verify text landed
-tmux-bridge keys antigravity Enter                 # 4. KEYS — submit
-# STOP. Do NOT read antigravity for a reply. The agent replies into YOUR pane.
+tmux-bridge read agents 20                    # 3. READ — verify text landed
+tmux-bridge keys agents Enter                 # 4. KEYS — submit
+# STOP. Do NOT read agents for a reply. The agent replies into YOUR pane.
 ```
 
 **Approving a prompt (non-agent pane):**
@@ -97,23 +97,23 @@ tmux-bridge name "$(tmux-bridge id)" claude
 tmux-bridge list
 
 # 3. Send a message (read-act-read)
-tmux-bridge read antigravity 20
-tmux-bridge message antigravity 'Please review the changes in src/auth.ts'
-tmux-bridge read antigravity 20
-tmux-bridge keys antigravity Enter
+tmux-bridge read agents 20
+tmux-bridge message agents 'Please review the changes in src/auth.ts'
+tmux-bridge read agents 20
+tmux-bridge keys agents Enter
 ```
 
 ### Example Conversation
 
 **Agent A (claude) sends:**
 ```bash
-tmux-bridge read antigravity 20
-tmux-bridge message antigravity 'What is the test coverage for src/auth.ts?'
-tmux-bridge read antigravity 20
-tmux-bridge keys antigravity Enter
+tmux-bridge read agents 20
+tmux-bridge message agents 'What is the test coverage for src/auth.ts?'
+tmux-bridge read agents 20
+tmux-bridge keys agents Enter
 ```
 
-**Agent B (antigravity) sees in their prompt:**
+**Agent B (agents) sees in their prompt:**
 ```
 [tmux-bridge from:claude pane:%4 at:3:0.0] What is the test coverage for src/auth.ts?
 ```

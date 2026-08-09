@@ -15,7 +15,7 @@ Control tmux sessions by sending keystrokes and reading output. Essential for ma
 
 ✅ **USE this skill when:**
 
-- Monitoring Claude/Antigravity sessions in tmux
+- Monitoring Claude/agents sessions in tmux
 - Sending input to interactive terminal applications
 - Scraping output from long-running processes in tmux
 - Navigating tmux panes/windows programmatically
@@ -126,7 +126,7 @@ tmux rename-session -t old new
 
 ## Sending Input Safely
 
-For interactive TUIs (Claude Code, Antigravity, etc.), split text and Enter into separate sends to avoid paste/multiline edge cases:
+For interactive TUIs (Claude Code, agents, etc.), split text and Enter into separate sends to avoid paste/multiline edge cases:
 
 ```bash
 tmux send-keys -t shared -l -- "Please apply the patch in src/foo.ts"

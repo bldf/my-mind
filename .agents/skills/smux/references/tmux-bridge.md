@@ -7,7 +7,7 @@ metadata:
 
 # tmux-bridge
 
-A single CLI that lets any AI agent (Claude Code, Antigravity, Gemini CLI, etc.) interact with any other tmux pane. Works via plain bash — any tool that can run shell commands can use it.
+A single CLI that lets any AI agent (Claude Code, agents, Gemini CLI, etc.) interact with any other tmux pane. Works via plain bash — any tool that can run shell commands can use it.
 
 Every command is **atomic**: `type` types text (no Enter), `keys` sends special keys, `read` captures pane content. There is no compound "send" command — you control each step and verify between them.
 
@@ -39,8 +39,8 @@ The CLI **enforces** read-before-act. You cannot `type` or `keys` to a pane unle
 This enforces the **read-act-read** cycle at the CLI level. If you skip the read, the command fails:
 
 ```
-$ tmux-bridge type antigravity "hello"
-error: must read the pane before interacting. Run: tmux-bridge read antigravity
+$ tmux-bridge type agents "hello"
+error: must read the pane before interacting. Run: tmux-bridge read agents
 ```
 
 ## When to Use
@@ -65,11 +65,11 @@ error: must read the pane before interacting. Run: tmux-bridge read antigravity
 | Command | Description | Example |
 |---|---|---|
 | `tmux-bridge list` | Show all panes with target, pid, command, size, label | `tmux-bridge list` |
-| `tmux-bridge type <target> <text>` | Type text without pressing Enter | `tmux-bridge type antigravity "hello"` |
-| `tmux-bridge read <target> [lines]` | Read last N lines (default 50) | `tmux-bridge read antigravity 100` |
-| `tmux-bridge keys <target> <key>...` | Send special keys | `tmux-bridge keys antigravity Enter` |
-| `tmux-bridge name <target> <label>` | Label a pane (visible in tmux border) | `tmux-bridge name %3 antigravity` |
-| `tmux-bridge resolve <label>` | Print pane target for a label | `tmux-bridge resolve antigravity` |
+| `tmux-bridge type <target> <text>` | Type text without pressing Enter | `tmux-bridge type agents "hello"` |
+| `tmux-bridge read <target> [lines]` | Read last N lines (default 50) | `tmux-bridge read agents 100` |
+| `tmux-bridge keys <target> <key>...` | Send special keys | `tmux-bridge keys agents Enter` |
+| `tmux-bridge name <target> <label>` | Label a pane (visible in tmux border) | `tmux-bridge name %3 agents` |
+| `tmux-bridge resolve <label>` | Print pane target for a label | `tmux-bridge resolve agents` |
 | `tmux-bridge id` | Print this pane's ID | `tmux-bridge id` |
 
 ## Target Resolution
@@ -78,7 +78,7 @@ Targets can be:
 - **tmux native**: `session:window.pane` (e.g. `shared:0.1`), pane ID (`%3`), or window index (`0`)
 - **label**: Any string set via `tmux-bridge name` — resolved automatically
 
-This means `tmux-bridge type antigravity "hello"` works directly if the pane was labeled `antigravity`.
+This means `tmux-bridge type agents "hello"` works directly if the pane was labeled `agents`.
 
 ## Messaging Convention
 
@@ -109,16 +109,16 @@ Keep replies concise (1-3 sentences). They will be typed into the sender's termi
 
 **Agent A (claude) sends:**
 ```bash
-tmux-bridge read antigravity 20       # 1. READ — satisfy read guard
-tmux-bridge type antigravity '[tmux-bridge from:claude] What is the test coverage for src/auth.ts?'
+tmux-bridge read agents 20       # 1. READ — satisfy read guard
+tmux-bridge type agents '[tmux-bridge from:claude] What is the test coverage for src/auth.ts?'
                                  # 2. TYPE — text appears, no Enter yet
-tmux-bridge read antigravity 20       # 3. READ — verify text landed
-tmux-bridge keys antigravity Enter    # 4. KEYS — press Enter to submit
-# Done. Do NOT wait, poll, or read antigravity for the response.
+tmux-bridge read agents 20       # 3. READ — verify text landed
+tmux-bridge keys agents Enter    # 4. KEYS — press Enter to submit
+# Done. Do NOT wait, poll, or read agents for the response.
 # Agent B will reply via tmux-bridge and it will appear in your pane.
 ```
 
-**Agent B (antigravity) sees in their prompt:**
+**Agent B (agents) sees in their prompt:**
 ```
 [tmux-bridge from:claude] What is the test coverage for src/auth.ts?
 ```
@@ -126,7 +126,7 @@ tmux-bridge keys antigravity Enter    # 4. KEYS — press Enter to submit
 **Agent B replies:**
 ```bash
 tmux-bridge read claude 20      # 1. READ — satisfy read guard
-tmux-bridge type claude '[tmux-bridge from:antigravity] src/auth.ts has 87% line coverage. Missing coverage on the OAuth refresh token path (lines 142-168).'
+tmux-bridge type claude '[tmux-bridge from:agents] src/auth.ts has 87% line coverage. Missing coverage on the OAuth refresh token path (lines 142-168).'
                                  # 2. TYPE — text appears, no Enter yet
 tmux-bridge read claude 20      # 3. READ — verify text landed
 tmux-bridge keys claude Enter   # 4. KEYS — press Enter to submit
@@ -149,18 +149,18 @@ The full cycle for sending a message:
 
 ```bash
 # 1. READ — check the pane and satisfy read guard
-tmux-bridge read antigravity 20
+tmux-bridge read agents 20
 
 # 2. TYPE — type the message (no Enter)
-tmux-bridge type antigravity '[tmux-bridge from:claude] Please review the changes in src/auth.ts'
+tmux-bridge type agents '[tmux-bridge from:claude] Please review the changes in src/auth.ts'
 
 # 3. READ — verify the text landed correctly
-tmux-bridge read antigravity 20
+tmux-bridge read agents 20
 
 # 4. KEYS — press Enter to submit
-tmux-bridge keys antigravity Enter
+tmux-bridge keys agents Enter
 
-# STOP. Do NOT read antigravity to check for a reply.
+# STOP. Do NOT read agents to check for a reply.
 # The other agent will reply via tmux-bridge into YOUR pane.
 ```
 
@@ -200,10 +200,10 @@ tmux-bridge list
 ### Step 3: Read, type, read, Enter
 
 ```bash
-tmux-bridge read antigravity 20
-tmux-bridge type antigravity '[tmux-bridge from:claude] Please review the changes in src/auth.ts and suggest improvements'
-tmux-bridge read antigravity 20
-tmux-bridge keys antigravity Enter
+tmux-bridge read agents 20
+tmux-bridge type agents '[tmux-bridge from:claude] Please review the changes in src/auth.ts and suggest improvements'
+tmux-bridge read agents 20
+tmux-bridge keys agents Enter
 # Done. Wait for the reply to appear in your pane.
 ```
 

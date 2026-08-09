@@ -56,7 +56,7 @@ description: Generate or update development specs from requirement documents, pr
 ### Step 4: 读取项目上下文
 
 - 读取各仓库的 `AGENTS.md` 了解技术栈
-- 读取 `.antigravity/rules/` 下所有规则文件
+- 读取 `.agents/rules/` 下所有规则文件
 - 扫描目录结构，了解现有模块划分
 
 ### Step 5: 分析需求
@@ -154,7 +154,7 @@ description: Generate or update development specs from requirement documents, pr
 
 ### Step 9: 生成 design.md
 
-**必须先读取项目 `AGENTS.md` 和 `.antigravity/rules/` 下所有规范文件**，设计方案必须遵循项目已有的技术规范和约定。
+**必须先读取项目 `AGENTS.md` 和 `.agents/rules/` 下所有规范文件**，设计方案必须遵循项目已有的技术规范和约定。
 
 按功能模块设计，每个模块说明涉及哪些层（前端、后端、数据库、合约等），具体分层根据项目实际架构决定，不做硬编码限制。
 
@@ -176,7 +176,7 @@ description: Generate or update development specs from requirement documents, pr
 
 ### 模块 1: {模块名}
 
-{技术方案，遵循 .antigravity/rules/ 中的规范}
+{技术方案，遵循 .agents/rules/ 中的规范}
 
 **涉及层及关键设计:**
 
@@ -196,7 +196,7 @@ description: Generate or update development specs from requirement documents, pr
 
 ## 安全考虑
 
-{基于 .antigravity/rules/security.md 和项目特有的安全规范}
+{基于 .agents/rules/security.md 和项目特有的安全规范}
 
 ## 技术决策
 
@@ -291,7 +291,7 @@ description: Generate or update development specs from requirement documents, pr
 - design.md
 - tasks.md
 - `{SPECS_DIR}/LESSONS.md`（如存在）
-- 当前代码项目的 `AGENTS.md` 和 `.antigravity/rules/`
+- 当前代码项目的 `AGENTS.md` 和 `.agents/rules/`
 
 ### Change Step 3: 分析变更影响
 

@@ -7,7 +7,7 @@
 优先调用当前环境可用的 `my-doc-syncer` skill；如果没有该 skill，则直接按以下清单完成文档同步：
 
 - README 精炼更新（架构 + 业务 + 快速开始）
-- `AGENTS.md` 和 `.antigravity/rules/` 同步
+- `AGENTS.md` 和 `.agents/rules/` 同步
 - specs CHANGELOG 按日期生成
 - 文档一致性验证
 

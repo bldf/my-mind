@@ -26,7 +26,7 @@ description: QA 工程师 Skill，执行功能测试、E2E 测试、可视化回
 
 - requirements.md 中的验收标准
 - design.md 了解功能模块和接口契约
-- `.antigravity/rules/testing.md`（如存在）
+- `.agents/rules/testing.md`（如存在）
 - 扫描现有测试文件了解测试模式和覆盖情况
 
 ### 3. 补全测试
@@ -55,14 +55,14 @@ npx playwright test       # E2E
 
 1. 启动开发服务器
 2. 选择浏览器驱动（按优先级）：
-   - **检查项目配置**：如 `.antigravity/rules/testing.md` 中指定了 `browser_driver`，使用用户指定的方式
+   - **检查项目配置**：如 `.agents/rules/testing.md` 中指定了 `browser_driver`，使用用户指定的方式
    - **默认：Playwright CDP（无头模式）** — 不弹窗，适合截图对比、DOM 断言、样式回归等大多数场景
    - **自动升级：Chrome DevTools MCP** — 当检测到以下场景时切换：需要登录态/Cookie 持久化、OAuth/第三方弹窗交互、需要观察真实动画/过渡效果、用户明确要求实时调试
    - 切换前输出：`🔄 切换到 Chrome DevTools MCP — 原因: {原因}，浏览器窗口将弹出`
 3. 截图保存
 4. 对比基准截图（如有）
 
-> **用户覆盖**：在 `.antigravity/rules/testing.md` 中添加 `browser_driver: playwright | chrome-mcp | ask` 可固定选择或设为每次询问。
+> **用户覆盖**：在 `.agents/rules/testing.md` 中添加 `browser_driver: playwright | chrome-mcp | ask` 可固定选择或设为每次询问。
 
 ### 6. 验收标准核验
 
