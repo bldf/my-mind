@@ -1,4 +1,4 @@
-import { cloneDocument } from "./document";
+import { cloneDocument, getNodeChildBranchSide, getVisibleChildIds } from "./document";
 import type { LayoutGraph, LayoutResult, MindMapDocument, MindMapNode, NodeId, Point } from "./types";
 
 export const MIN_NODE_WIDTH = 56;
@@ -186,7 +186,7 @@ function simpleDirectionalLayout(document: MindMapDocument, rootId: NodeId, star
 }
 
 export function documentToLayoutGraph(document: MindMapDocument): LayoutGraph {
-  const nodes = Object.values(document.nodes).map((node) => {
+  const nodes = Object.values(document.nodes).map((node): LayoutGraph["nodes"][number] => {
     const scale = node.style.scale ?? 1;
     return {
       id: node.id,
@@ -197,6 +197,10 @@ export function documentToLayoutGraph(document: MindMapDocument): LayoutGraph {
       data: {
         title: node.title,
         collapsed: node.collapsed,
+        branchSide: node.metadata.branchSide === "left" || node.metadata.branchSide === "right"
+          ? node.metadata.branchSide : undefined,
+        collapsedLeft: typeof node.metadata.collapsedLeft === "boolean" ? node.metadata.collapsedLeft : undefined,
+        collapsedRight: typeof node.metadata.collapsedRight === "boolean" ? node.metadata.collapsedRight : undefined,
       },
     };
   });
@@ -305,25 +309,19 @@ export function simpleTreeLayout(
 
   const shouldSplitRoot = root.children.length > 1;
 
-  if (!root.collapsed) {
-    const pivot = shouldSplitRoot ? Math.ceil(root.children.length / 2) : root.children.length;
-    const firstSide: -1 | 1 = shouldSplitRoot ? (direction === "left" ? 1 : -1) : direction === "left" ? -1 : 1;
-    const secondSide: -1 | 1 = firstSide === -1 ? 1 : -1;
-    const firstBranch = root.children.slice(0, pivot).map((childId) => buildLayoutBox(document, childId, firstSide, compactGapY, resolveSize));
-    const secondBranch = shouldSplitRoot
-      ? root.children.slice(pivot).map((childId) => buildLayoutBox(document, childId, secondSide, compactGapY, resolveSize))
-      : [];
-
-    for (const branch of [firstBranch, secondBranch]) {
-      if (branch.length === 0) continue;
-      const totalHeight = stackHeight(branch, compactGapY);
-      let cursorY = -totalHeight / 2;
-      for (const child of branch) {
-        const childCenterY = cursorY + child.subtreeHeight / 2;
-        const childCenterX = child.side * (rootSize.width / 2 + compactGapX + child.width / 2);
-        placeLayoutBox(child, childCenterX, childCenterY, compactGapX, compactGapY, positions);
-        cursorY += child.subtreeHeight + compactGapY;
-      }
+  const visibleChildren = getVisibleChildIds(document, root);
+  for (const side of [-1, 1] as const) {
+    const branchSide = side === -1 ? "left" : "right";
+    const branch = visibleChildren
+      .filter((childId) => getNodeChildBranchSide(document, root, childId) === branchSide)
+      .map((childId) => buildLayoutBox(document, childId, side, compactGapY, resolveSize));
+    const totalHeight = stackHeight(branch, compactGapY);
+    let cursorY = -totalHeight / 2;
+    for (const child of branch) {
+      const childCenterY = cursorY + child.subtreeHeight / 2;
+      const childCenterX = child.side * (rootSize.width / 2 + compactGapX + child.width / 2);
+      placeLayoutBox(child, childCenterX, childCenterY, compactGapX, compactGapY, positions);
+      cursorY += child.subtreeHeight + compactGapY;
     }
   }
 

@@ -25,6 +25,13 @@ export interface MindNodeData extends Record<string, unknown> {
   readonly?: boolean;
   readonlyCollapsible?: boolean;
   branchSide?: MindNodeBranchSide;
+  isTwoSided?: boolean;
+  collapsedLeft?: boolean;
+  collapsedRight?: boolean;
+  collapsedHiddenCountLeft?: number;
+  collapsedHiddenCountRight?: number;
+  hasLeftChildren?: boolean;
+  hasRightChildren?: boolean;
   dropIntent?: DropIntent;
   link?: NodeLink;
   collapsedHiddenCount?: number;
@@ -40,8 +47,8 @@ export interface MindNodeData extends Record<string, unknown> {
   onResizeProgress?: (nodeId: NodeId, scale: number) => void;
   onResizeCommit?: (nodeId: NodeId, scale: number) => void;
   onAddChild?: (nodeId: NodeId) => void;
-  onToggleCollapse?: (nodeId: NodeId) => void;
-  onExpandCollapsed?: (nodeId: NodeId) => void;
+  onToggleCollapse?: (nodeId: NodeId, side?: "left" | "right") => void;
+  onExpandCollapsed?: (nodeId: NodeId, side?: "left" | "right") => void;
   onOpenLink?: (url: string, node: MindMapNode) => void;
   renderNode?: (node: MindMapNode, selected: boolean) => ReactNode;
 }
@@ -112,6 +119,10 @@ export const MindNode = memo(function MindNode(props: NodeProps) {
     Boolean(data.onToggleCollapse);
   const canExpandCollapsed =
     hasCollapsedHiddenCount && canToggleCollapse && Boolean(data.onExpandCollapsed);
+  const canExpandCollapsedLeft =
+    (data.collapsedHiddenCountLeft ?? 0) > 0 && canToggleCollapse && Boolean(data.onExpandCollapsed);
+  const canExpandCollapsedRight =
+    (data.collapsedHiddenCountRight ?? 0) > 0 && canToggleCollapse && Boolean(data.onExpandCollapsed);
   const canShowResizeControls =
     props.selected &&
     !data.readonly &&
@@ -257,6 +268,7 @@ export const MindNode = memo(function MindNode(props: NodeProps) {
         data.highlighted ? "mmn-node--highlighted" : "",
         data.flash ? "mmn-node--drop-flash" : "",
         data.branchSide ? `mmn-node--branch-${data.branchSide}` : "",
+        data.isTwoSided ? "mmn-node--two-sided" : "",
         data.dropIntent?.type === "reparent" && !data.dropIntent.noOp ? "mmn-node--drop-reparent" : "",
         data.dropIntent?.type === "reparent" && data.dropIntent.armed && !data.dropIntent.noOp ? "mmn-node--drop-armed" : "",
         data.dropIntent?.type === "sort-before" && !data.dropIntent.noOp ? "mmn-node--sort-before" : "",
@@ -404,7 +416,91 @@ export const MindNode = memo(function MindNode(props: NodeProps) {
           <Plus size={15} />
         </button>
       ) : null}
-      {canShowCollapse ? (
+      {data.isTwoSided && data.hasLeftChildren ? (
+        data.collapsedLeft && (data.collapsedHiddenCountLeft ?? 0) > 0 ? (
+          canExpandCollapsedLeft ? (
+            <button
+              className="mmn-node__collapsed-count mmn-node__collapsed-count--left nodrag nopan"
+              type="button"
+              title={`Expand left branch of ${node.title}`}
+              aria-label={`Expand left branch of ${node.title}, ${data.collapsedHiddenCountLeft} hidden nodes`}
+              onPointerDown={(event) => event.stopPropagation()}
+              onMouseDown={(event) => event.stopPropagation()}
+              onClick={(event) => {
+                event.stopPropagation();
+                data.onExpandCollapsed?.(node.id, "left");
+              }}
+            >
+              +{data.collapsedHiddenCountLeft}
+            </button>
+          ) : (
+            <span
+              className="mmn-node__collapsed-count mmn-node__collapsed-count--left mmn-node__collapsed-count--readonly"
+              aria-label={`${node.title} left branch has ${data.collapsedHiddenCountLeft} hidden nodes`}
+            >
+              +{data.collapsedHiddenCountLeft}
+            </span>
+          )
+        ) : canShowCollapse && !data.collapsedLeft ? (
+          <button
+            className="mmn-node__control mmn-node__control--collapse mmn-node__control--collapse-left nodrag nopan"
+            type="button"
+            title={`Collapse left branch of ${node.title}`}
+            aria-label={`Collapse left branch of ${node.title}`}
+            onPointerDown={(event) => event.stopPropagation()}
+            onMouseDown={(event) => event.stopPropagation()}
+            onClick={(event) => {
+              event.stopPropagation();
+              data.onToggleCollapse?.(node.id, "left");
+            }}
+          >
+            <ChevronLeft size={15} />
+          </button>
+        ) : null
+      ) : null}
+      {data.isTwoSided && data.hasRightChildren ? (
+        data.collapsedRight && (data.collapsedHiddenCountRight ?? 0) > 0 ? (
+          canExpandCollapsedRight ? (
+            <button
+              className="mmn-node__collapsed-count mmn-node__collapsed-count--right nodrag nopan"
+              type="button"
+              title={`Expand right branch of ${node.title}`}
+              aria-label={`Expand right branch of ${node.title}, ${data.collapsedHiddenCountRight} hidden nodes`}
+              onPointerDown={(event) => event.stopPropagation()}
+              onMouseDown={(event) => event.stopPropagation()}
+              onClick={(event) => {
+                event.stopPropagation();
+                data.onExpandCollapsed?.(node.id, "right");
+              }}
+            >
+              +{data.collapsedHiddenCountRight}
+            </button>
+          ) : (
+            <span
+              className="mmn-node__collapsed-count mmn-node__collapsed-count--right mmn-node__collapsed-count--readonly"
+              aria-label={`${node.title} right branch has ${data.collapsedHiddenCountRight} hidden nodes`}
+            >
+              +{data.collapsedHiddenCountRight}
+            </span>
+          )
+        ) : canShowCollapse && !data.collapsedRight ? (
+          <button
+            className="mmn-node__control mmn-node__control--collapse mmn-node__control--collapse-right nodrag nopan"
+            type="button"
+            title={`Collapse right branch of ${node.title}`}
+            aria-label={`Collapse right branch of ${node.title}`}
+            onPointerDown={(event) => event.stopPropagation()}
+            onMouseDown={(event) => event.stopPropagation()}
+            onClick={(event) => {
+              event.stopPropagation();
+              data.onToggleCollapse?.(node.id, "right");
+            }}
+          >
+            <ChevronRight size={15} />
+          </button>
+        ) : null
+      ) : null}
+      {!data.isTwoSided && canShowCollapse ? (
         <button
           className="mmn-node__control mmn-node__control--collapse nodrag nopan"
           type="button"
@@ -436,7 +532,7 @@ export const MindNode = memo(function MindNode(props: NodeProps) {
           <RotateCcw size={14} />
         </button>
       ) : null}
-      {hasCollapsedHiddenCount ? (
+      {!data.isTwoSided && hasCollapsedHiddenCount ? (
         canExpandCollapsed ? (
           <button
             className="mmn-node__collapsed-count nodrag nopan"

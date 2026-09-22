@@ -1,8 +1,8 @@
-import type { LayoutNodeSize, MindMapDocument } from "@my-mind-node/core";
+import { setNodeCollapsed, type LayoutNodeSize, type MindMapDocument } from "@my-mind-node/core";
 import type { Node, NodeChange } from "@xyflow/react";
 
 export type NodeSizeMap = Record<string, LayoutNodeSize>;
-export type CollapsedOverrides = Record<string, boolean>;
+export type CollapsedOverrides = Record<string, { collapsed?: boolean; left?: boolean; right?: boolean }>;
 
 /** 小于该差值的尺寸抖动不触发重新排布，避免亚像素测量导致的循环。 */
 const SIZE_CHANGE_TOLERANCE_PX = 0.5;
@@ -47,14 +47,26 @@ export function applyCollapsedOverrides(
   document: MindMapDocument,
   overrides: CollapsedOverrides,
 ): MindMapDocument {
-  const entries = Object.entries(overrides).filter(
-    ([nodeId, collapsed]) => document.nodes[nodeId] && document.nodes[nodeId]!.collapsed !== collapsed,
-  );
+  const entries = Object.entries(overrides);
   if (entries.length === 0) return document;
 
+  let changed = false;
   const nodes = { ...document.nodes };
-  for (const [nodeId, collapsed] of entries) {
-    nodes[nodeId] = { ...nodes[nodeId]!, collapsed };
+
+  for (const [nodeId, override] of entries) {
+    const node = nodes[nodeId];
+    if (!node) continue;
+    let next = node;
+    if (override.collapsed !== undefined) next = setNodeCollapsed(next, override.collapsed);
+    if (override.left !== undefined) next = setNodeCollapsed(next, override.left, "left");
+    if (override.right !== undefined) next = setNodeCollapsed(next, override.right, "right");
+    if (next.collapsed !== node.collapsed ||
+        next.metadata.collapsedLeft !== node.metadata.collapsedLeft ||
+        next.metadata.collapsedRight !== node.metadata.collapsedRight) {
+      nodes[nodeId] = next;
+      changed = true;
+    }
   }
-  return { ...document, nodes };
+
+  return changed ? { ...document, nodes } : document;
 }

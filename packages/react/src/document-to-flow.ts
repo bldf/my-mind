@@ -1,4 +1,11 @@
-import { getVisibleNodeIds, simpleTreeLayout } from "@my-mind-node/core";
+import {
+  countSideDescendants,
+  getNodeChildBranchSide,
+  getVisibleNodeIds,
+  isNodeSideCollapsed,
+  usesNodeSideCollapse,
+  simpleTreeLayout,
+} from "@my-mind-node/core";
 import type { LayoutNodeSize, MindMapDocument, MindMapNode, NodeId, MindMapTheme } from "@my-mind-node/core";
 import type { ReactNode } from "react";
 import type { Edge, Node } from "@xyflow/react";
@@ -30,8 +37,8 @@ export interface FlowConversionOptions {
   onResizeProgress?: (nodeId: NodeId, scale: number) => void;
   onResizeCommit?: (nodeId: NodeId, scale: number) => void;
   onAddChild?: (nodeId: NodeId) => void;
-  onToggleCollapse?: (nodeId: NodeId) => void;
-  onExpandCollapsed?: (nodeId: NodeId) => void;
+  onToggleCollapse?: (nodeId: NodeId, side?: "left" | "right") => void;
+  onExpandCollapsed?: (nodeId: NodeId, side?: "left" | "right") => void;
   onOpenLink?: (url: string, node: MindMapNode) => void;
   showNodeResizeControls?: boolean;
   nodeResizeStep?: number;
@@ -307,6 +314,33 @@ export function documentToFlow(
   const nodes: Array<Node<MindNodeData, "mindNode">> = visibleIds.flatMap((nodeId) => {
     const node = presentationNodes.get(nodeId);
     if (!node) return [];
+
+    const isTwoSided = usesNodeSideCollapse(effectiveDocument, node);
+    let collapsedLeft = false;
+    let collapsedRight = false;
+    let collapsedHiddenCountLeft: number | undefined;
+    let collapsedHiddenCountRight: number | undefined;
+    let hasLeftChildren = false;
+    let hasRightChildren = false;
+
+    if (isTwoSided) {
+      collapsedLeft = isNodeSideCollapsed(node, "left");
+      collapsedRight = isNodeSideCollapsed(node, "right");
+      for (const childId of node.children) {
+        const side = getNodeChildBranchSide(effectiveDocument, node, childId);
+        if (side === "left") hasLeftChildren = true;
+        if (side === "right") hasRightChildren = true;
+      }
+      if (collapsedLeft) {
+        const count = countSideDescendants(effectiveDocument, node, "left");
+        if (count > 0) collapsedHiddenCountLeft = count;
+      }
+      if (collapsedRight) {
+        const count = countSideDescendants(effectiveDocument, node, "right");
+        if (count > 0) collapsedHiddenCountRight = count;
+      }
+    }
+
     return {
       id: node.id,
       type: "mindNode",
@@ -320,9 +354,16 @@ export function documentToFlow(
         readonly: options.readonly,
         readonlyCollapsible: options.readonlyCollapsible,
         branchSide: getBranchSide(effectiveDocument, node, viewRootId),
+        isTwoSided,
+        collapsedLeft,
+        collapsedRight,
+        collapsedHiddenCountLeft,
+        collapsedHiddenCountRight,
+        hasLeftChildren,
+        hasRightChildren,
         dropIntent: getNodeDropIntent(options.dropIntent, node.id),
         link: getPrimaryNodeLink(node),
-        collapsedHiddenCount: getCollapsedHiddenCount(effectiveDocument, node),
+        collapsedHiddenCount: isTwoSided ? undefined : getCollapsedHiddenCount(effectiveDocument, node),
         showAddChildControl: options.showAddChildControl !== false && !node.collapsed,
         showCollapseControl: options.showCollapseControl,
         showNodeResizeControls: options.showNodeResizeControls,

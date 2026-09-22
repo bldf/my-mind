@@ -7,7 +7,11 @@ import {
   estimateLayoutNodeHeight,
   estimateLayoutTitleWidth,
   exportIndentedText,
+  countSideDescendants,
+  getVisibleNodeIds,
   importIndentedText,
+  isNodeSideCollapsed,
+  isNodeTwoSided,
   parseDocument,
   searchDocument,
   serializeDocument,
@@ -222,6 +226,131 @@ describe("@my-mind-node/core", () => {
       });
 
       expect(layout.positions[nextId]!.y).toBeGreaterThanOrEqual(layout.positions[tallId]!.y + 200);
+    });
+  });
+
+  describe("independent left/right branch collapse", () => {
+    function createTwoSidedDocument() {
+      let doc = createEmptyDocument({ title: "Map", rootTitle: "Root" });
+      const rootId = doc.rootId;
+      // create 4 children: 2 left (c0, c1), 2 right (c2, c3)
+      for (let i = 0; i < 4; i++) {
+        doc = dispatchCommand(doc, { type: "node.create", parentId: rootId, title: `Child ${i}` }).document;
+      }
+      const [c0, c1, c2, c3] = doc.nodes[rootId]!.children;
+      // create grandchild under c0
+      doc = dispatchCommand(doc, { type: "node.create", parentId: c0, title: "Grandchild 0" }).document;
+      return { doc, rootId, c0: c0!, c1: c1!, c2: c2!, c3: c3! };
+    }
+
+    it("identifies two-sided root node", () => {
+      const { doc, rootId, c0 } = createTwoSidedDocument();
+      expect(isNodeTwoSided(doc, doc.nodes[rootId]!)).toBe(true);
+      expect(isNodeTwoSided(doc, doc.nodes[c0]!)).toBe(false);
+    });
+
+    it("collapses left side without affecting right side", () => {
+      const { doc, rootId, c0, c1, c2, c3 } = createTwoSidedDocument();
+      const collapsedLeftDoc = dispatchCommand(doc, {
+        type: "node.collapse",
+        nodeIds: [rootId],
+        collapsed: true,
+        side: "left",
+      }).document;
+
+      expect(isNodeSideCollapsed(collapsedLeftDoc.nodes[rootId]!, "left")).toBe(true);
+      expect(isNodeSideCollapsed(collapsedLeftDoc.nodes[rootId]!, "right")).toBe(false);
+      expect(collapsedLeftDoc.nodes[rootId]!.collapsed).toBe(false);
+
+      const visibleIds = getVisibleNodeIds(collapsedLeftDoc);
+      // Left children c0, c1 and grandchild under c0 should NOT be visible
+      expect(visibleIds).not.toContain(c0);
+      expect(visibleIds).not.toContain(c1);
+      // Right children c2, c3 should be visible
+      expect(visibleIds).toContain(c2);
+      expect(visibleIds).toContain(c3);
+      expect(visibleIds).toContain(rootId);
+
+      // Layout should only position root and right children
+      const layout = simpleTreeLayout(collapsedLeftDoc);
+      expect(layout.positions[c0]).toBeUndefined();
+      expect(layout.positions[c1]).toBeUndefined();
+      expect(layout.positions[c2]).toBeDefined();
+      expect(layout.positions[c3]).toBeDefined();
+    });
+
+    it("collapses right side without affecting left side", () => {
+      const { doc, rootId, c0, c1, c2, c3 } = createTwoSidedDocument();
+      const collapsedRightDoc = dispatchCommand(doc, {
+        type: "node.collapse",
+        nodeIds: [rootId],
+        collapsed: true,
+        side: "right",
+      }).document;
+
+      expect(isNodeSideCollapsed(collapsedRightDoc.nodes[rootId]!, "left")).toBe(false);
+      expect(isNodeSideCollapsed(collapsedRightDoc.nodes[rootId]!, "right")).toBe(true);
+      expect(collapsedRightDoc.nodes[rootId]!.collapsed).toBe(false);
+
+      const visibleIds = getVisibleNodeIds(collapsedRightDoc);
+      // Left children should be visible
+      expect(visibleIds).toContain(c0);
+      expect(visibleIds).toContain(c1);
+      // Right children should NOT be visible
+      expect(visibleIds).not.toContain(c2);
+      expect(visibleIds).not.toContain(c3);
+    });
+
+    it("counts side descendants accurately", () => {
+      const { doc, rootId } = createTwoSidedDocument();
+      // Left has c0 (with 1 grandchild) and c1 -> total 3
+      expect(countSideDescendants(doc, doc.nodes[rootId]!, "left")).toBe(3);
+      // Right has c2 and c3 -> total 2
+      expect(countSideDescendants(doc, doc.nodes[rootId]!, "right")).toBe(2);
+    });
+
+    it.each([1, 2])("keeps visibility and layout consistent with %i children on the collapsed side", (remaining) => {
+      const { doc, rootId, c0, c1, c2, c3 } = createTwoSidedDocument();
+      for (const id of [c0, c1]) doc.nodes[id]!.metadata.branchSide = "left";
+      for (const id of [c2, c3]) doc.nodes[id]!.metadata.branchSide = "right";
+      let current = dispatchCommand(doc, { type: "node.collapse", nodeIds: [rootId], collapsed: true, side: "left" }).document;
+      for (const id of [c2, c3, ...(remaining === 1 ? [c1] : [])]) {
+        current = dispatchCommand(current, { type: "node.delete", nodeId: id }).document;
+      }
+      expect(getVisibleNodeIds(current)).toEqual([rootId]);
+      expect(Object.keys(simpleTreeLayout(current).positions)).toEqual([rootId]);
+      current = dispatchCommand(current, { type: "node.collapse", nodeIds: [rootId], collapsed: false, side: "left" }).document;
+      expect(getVisibleNodeIds(current)).toContain(c0);
+      expect(simpleTreeLayout(current).positions[c0]!.x).toBeLessThan(simpleTreeLayout(current).positions[rootId]!.x);
+    });
+
+    it("expands left side when both sides were collapsed", () => {
+      const { doc, rootId, c0, c1, c2, c3 } = createTwoSidedDocument();
+      // Fully collapse root
+      let current = dispatchCommand(doc, {
+        type: "node.collapse",
+        nodeIds: [rootId],
+        collapsed: true,
+      }).document;
+      expect(current.nodes[rootId]!.collapsed).toBe(true);
+
+      // Expand left side only
+      current = dispatchCommand(current, {
+        type: "node.collapse",
+        nodeIds: [rootId],
+        collapsed: false,
+        side: "left",
+      }).document;
+
+      expect(isNodeSideCollapsed(current.nodes[rootId]!, "left")).toBe(false);
+      expect(isNodeSideCollapsed(current.nodes[rootId]!, "right")).toBe(true);
+      expect(current.nodes[rootId]!.collapsed).toBe(false);
+
+      const visible = getVisibleNodeIds(current);
+      expect(visible).toContain(c0);
+      expect(visible).toContain(c1);
+      expect(visible).not.toContain(c2);
+      expect(visible).not.toContain(c3);
     });
   });
 });

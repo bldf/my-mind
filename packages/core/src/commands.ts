@@ -1,4 +1,4 @@
-import { asNodeId, cloneDocument, createId, createNode, getAncestorIds, getDescendantIds } from "./document";
+import { asNodeId, cloneDocument, createId, createNode, getAncestorIds, getDescendantIds, setNodeCollapsed } from "./document";
 import { validateDocument } from "./validation";
 import type {
   CommandResult,
@@ -185,7 +185,7 @@ function applyDocumentCommand(document: MindMapDocument, command: Exclude<MindMa
     case "node.collapse": {
       for (const nodeId of command.nodeIds) {
         const node = next.nodes[nodeId];
-        if (node) node.collapsed = command.collapsed;
+        if (node) next.nodes[nodeId] = setNodeCollapsed(node, command.collapsed, command.side);
       }
       break;
     }

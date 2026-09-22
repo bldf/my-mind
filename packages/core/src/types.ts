@@ -141,7 +141,7 @@ export type MindMapCommand =
   | { type: "node.moveMany"; nodeIds: NodeId[]; parentId: NodeId; index?: number; meta?: ChangeMeta }
   | { type: "node.translate"; nodeIds: NodeId[]; delta: Point; meta?: ChangeMeta }
   | { type: "node.resize"; nodeIds: NodeId[]; delta: number; minScale?: number; maxScale?: number; meta?: ChangeMeta }
-  | { type: "node.collapse"; nodeIds: NodeId[]; collapsed: boolean; meta?: ChangeMeta }
+  | { type: "node.collapse"; nodeIds: NodeId[]; collapsed: boolean; side?: "left" | "right"; meta?: ChangeMeta }
   | { type: "tag.upsert"; tag: MindMapTag; meta?: ChangeMeta }
   | { type: "tag.remove"; tagId: TagId; meta?: ChangeMeta }
   | { type: "connection.create"; connection: Omit<MindMapConnection, "id" | "metadata"> & Partial<Pick<MindMapConnection, "id" | "metadata">>; meta?: ChangeMeta }
@@ -177,6 +177,9 @@ export interface LayoutNode {
   data: {
     title: string;
     collapsed: boolean;
+    branchSide?: "left" | "right";
+    collapsedLeft?: boolean;
+    collapsedRight?: boolean;
   };
 }
 

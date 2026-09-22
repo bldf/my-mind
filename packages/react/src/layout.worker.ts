@@ -22,7 +22,11 @@ self.onmessage = (event: MessageEvent<LayoutWorkerRequest>) => {
             links: [],
             tagIds: [],
             style: {},
-            metadata: {},
+            metadata: {
+              branchSide: node.data.branchSide,
+              collapsedLeft: node.data.collapsedLeft,
+              collapsedRight: node.data.collapsedRight,
+            },
           },
         ]),
       ),

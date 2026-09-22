@@ -126,14 +126,125 @@ export function getAncestorIds(document: MindMapDocument, nodeId: NodeId): NodeI
   return result;
 }
 
+export function isNodeSideCollapsed(node: MindMapNode, side: "left" | "right"): boolean {
+  if (node.collapsed) return true;
+  if (side === "left") return Boolean(node.metadata?.collapsedLeft);
+  if (side === "right") return Boolean(node.metadata?.collapsedRight);
+  return false;
+}
+
+/** 统一编辑命令和只读视图的折叠状态转换。 */
+export function setNodeCollapsed(node: MindMapNode, collapsed: boolean, side?: "left" | "right"): MindMapNode {
+  if (side) {
+    const otherSide = side === "left" ? "right" : "left";
+    const otherCollapsed = isNodeSideCollapsed(node, otherSide);
+    return {
+      ...node,
+      collapsed: collapsed && otherCollapsed,
+      metadata: {
+        ...node.metadata,
+        collapsedLeft: side === "left" ? collapsed : otherCollapsed,
+        collapsedRight: side === "right" ? collapsed : otherCollapsed,
+      },
+    };
+  }
+  const hasSideState = node.metadata.collapsedLeft !== undefined || node.metadata.collapsedRight !== undefined;
+  return {
+    ...node,
+    collapsed,
+    metadata: hasSideState ? { ...node.metadata, collapsedLeft: collapsed, collapsedRight: collapsed } : node.metadata,
+  };
+}
+
+export function getNodeChildBranchSide(
+  document: MindMapDocument,
+  parentNode: MindMapNode,
+  childId: NodeId,
+): "left" | "right" {
+  const child = document.nodes[childId];
+  if (child?.metadata?.branchSide === "left" || child?.metadata?.branchSide === "right") {
+    return child.metadata.branchSide;
+  }
+  if (parentNode.parentId !== null) {
+    if (parentNode.metadata?.branchSide === "left" || parentNode.metadata?.branchSide === "right") {
+      return parentNode.metadata.branchSide;
+    }
+  }
+  const direction = document.layout?.direction;
+  const isLeftDirection = direction === "left";
+  if (parentNode.children.length <= 1) {
+    return isLeftDirection ? "left" : "right";
+  }
+  const pivot = Math.ceil(parentNode.children.length / 2);
+  const index = parentNode.children.indexOf(childId);
+  if (isLeftDirection) {
+    return index < pivot ? "right" : "left";
+  }
+  return index < pivot ? "left" : "right";
+}
+
+export function isNodeTwoSided(document: MindMapDocument, node: MindMapNode): boolean {
+  if (node.id !== document.rootId && node.parentId !== null) return false;
+  const direction = document.layout?.direction;
+  if (direction === "up" || direction === "down") return false;
+  if (node.children.length <= 1) return false;
+  let hasLeft = false;
+  let hasRight = false;
+  for (const childId of node.children) {
+    const side = getNodeChildBranchSide(document, node, childId);
+    if (side === "left") hasLeft = true;
+    if (side === "right") hasRight = true;
+    if (hasLeft && hasRight) return true;
+  }
+  return false;
+}
+
+/** 删除或移动另一侧后，仍保留已有侧折叠状态及其展开入口。 */
+export function usesNodeSideCollapse(document: MindMapDocument, node: MindMapNode): boolean {
+  if (node.id !== document.rootId || node.children.length === 0) return false;
+  if (document.layout.direction === "up" || document.layout.direction === "down") return false;
+  return isNodeTwoSided(document, node) ||
+    node.metadata.collapsedLeft !== undefined || node.metadata.collapsedRight !== undefined;
+}
+
+export function getVisibleChildIds(document: MindMapDocument, node: MindMapNode): NodeId[] {
+  if (node.collapsed) return [];
+  if (!usesNodeSideCollapse(document, node)) return node.children;
+  return node.children.filter((childId) => !isNodeSideCollapsed(node, getNodeChildBranchSide(document, node, childId)));
+}
+
+export function countDescendants(document: MindMapDocument, nodeId: NodeId): number {
+  const node = document.nodes[nodeId];
+  if (!node) return 0;
+  return node.children.reduce(
+    (total, childId) =>
+      total + (document.nodes[childId] ? 1 + countDescendants(document, childId) : 0),
+    0,
+  );
+}
+
+export function countSideDescendants(
+  document: MindMapDocument,
+  parentNode: MindMapNode,
+  side: "left" | "right",
+): number {
+  return parentNode.children.reduce((total, childId) => {
+    const childSide = getNodeChildBranchSide(document, parentNode, childId);
+    if (childSide !== side) return total;
+    return total + (document.nodes[childId] ? 1 + countDescendants(document, childId) : 0);
+  }, 0);
+}
+
 export function getVisibleNodeIds(document: MindMapDocument, rootId: NodeId = document.rootId): NodeId[] {
   const result: NodeId[] = [];
+  const rootNode = document.nodes[rootId];
+  if (!rootNode) return result;
+
   const visit = (id: NodeId) => {
     const node = document.nodes[id];
     if (!node) return;
     result.push(id);
-    if (node.collapsed) return;
-    for (const childId of node.children) {
+    for (const childId of getVisibleChildIds(document, node)) {
       visit(childId);
     }
   };

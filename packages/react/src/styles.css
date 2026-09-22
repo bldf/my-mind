@@ -488,6 +488,36 @@
   left: auto;
 }
 
+.mmn-node--two-sided .mmn-node__control--collapse-left {
+  top: 50%;
+  left: -20px;
+  right: auto;
+  transform: translateY(-50%) scale(0.94);
+}
+
+.mmn-node--two-sided:hover .mmn-node__control--collapse-left,
+.mmn-node--two-sided:focus-within .mmn-node__control--collapse-left {
+  transform: translateY(-50%) scale(1);
+}
+
+.mmn-node--two-sided .mmn-node__control--collapse-right {
+  top: 50%;
+  right: -20px;
+  left: auto;
+  transform: translateY(-50%) scale(0.94);
+}
+
+.mmn-node--two-sided:hover .mmn-node__control--collapse-right,
+.mmn-node--two-sided:focus-within .mmn-node__control--collapse-right {
+  transform: translateY(-50%) scale(1);
+}
+
+.mmn-node--two-sided:has(.mmn-node__control--collapse-right) .mmn-node__control--add,
+.mmn-node--two-sided:has(.mmn-node__collapsed-count--right) .mmn-node__control--add {
+  top: calc(50% + 22px);
+  right: -28px;
+}
+
 .mmn-node--branch-up .mmn-node__control--add,
 .mmn-node--branch-down .mmn-node__control--add {
   top: auto;
@@ -544,6 +574,20 @@
 .mmn-node--branch-left .mmn-node__collapsed-count {
   right: -24px;
   left: auto;
+}
+
+.mmn-node--two-sided .mmn-node__collapsed-count--left {
+  top: 50%;
+  left: -24px;
+  right: auto;
+  transform: translateY(-50%);
+}
+
+.mmn-node--two-sided .mmn-node__collapsed-count--right {
+  top: 50%;
+  right: -24px;
+  left: auto;
+  transform: translateY(-50%);
 }
 
 .mmn-node--branch-up .mmn-node__collapsed-count,

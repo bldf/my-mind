@@ -58,7 +58,7 @@ describe("measured layout helpers", () => {
     const document = createBranchDocument();
     expect(applyCollapsedOverrides(document, {})).toBe(document);
 
-    const collapsed = applyCollapsedOverrides(document, { parent: true });
+    const collapsed = applyCollapsedOverrides(document, { parent: { collapsed: true } });
     expect(collapsed.nodes[asNodeId("parent")]!.collapsed).toBe(true);
     expect(document.nodes[asNodeId("parent")]!.collapsed).toBe(false);
   });

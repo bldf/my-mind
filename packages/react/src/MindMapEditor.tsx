@@ -9,6 +9,7 @@ import {
   dispatchCommand,
   getAncestorIds,
   getVisibleNodeIds,
+  isNodeSideCollapsed,
   serializeDocument,
   simpleTreeLayout,
   type MindMapDocument,
@@ -314,24 +315,32 @@ function EditorCanvas(props: MindMapEditorProps) {
     },
     [commitSelection, document.nodes, readonly, runCommand],
   );
-  const setReadonlyCollapsed = useCallback((nodeId: NodeId, collapsed: boolean) => {
-    setCollapsedOverrides((current) => ({ ...current, [nodeId]: collapsed }));
+  const setReadonlyCollapsed = useCallback((nodeId: NodeId, collapsed: boolean, side?: "left" | "right") => {
+    setCollapsedOverrides((current) => ({
+      ...current,
+      [nodeId]: side ? { ...current[nodeId], [side]: collapsed } : { collapsed },
+    }));
   }, []);
   const toggleNodeCollapse = useCallback(
-    (nodeId: NodeId) => {
+    (nodeId: NodeId, side?: "left" | "right") => {
       const node = viewDocument.nodes[nodeId];
-      if (node && readonlyCollapsible) { setReadonlyCollapsed(nodeId, !node.collapsed); return; }
-      if (!node || readonly) return;
-      runCommand({ type: "node.collapse", nodeIds: [nodeId], collapsed: !node.collapsed, meta: { source: "canvas", label: "Toggle collapse" } }, { autoLayout: true });
+      if (!node) return;
+      const isCollapsed = side ? isNodeSideCollapsed(node, side) : node.collapsed;
+      if (readonlyCollapsible) { setReadonlyCollapsed(nodeId, !isCollapsed, side); return; }
+      if (readonly) return;
+      runCommand({ type: "node.collapse", nodeIds: [nodeId], collapsed: !isCollapsed, side, meta: { source: "canvas", label: "Toggle collapse" } }, { autoLayout: true });
     },
     [readonly, readonlyCollapsible, runCommand, setReadonlyCollapsed, viewDocument.nodes],
   );
   const expandCollapsedNode = useCallback(
-    (nodeId: NodeId) => {
+    (nodeId: NodeId, side?: "left" | "right") => {
       const node = viewDocument.nodes[nodeId];
-      if (node?.collapsed && readonlyCollapsible) { setReadonlyCollapsed(nodeId, false); return; }
-      if (!node || readonly || !node.collapsed) return;
-      runCommand({ type: "node.collapse", nodeIds: [nodeId], collapsed: false, meta: { source: "canvas", label: "Expand collapsed branch" } }, { autoLayout: true });
+      if (!node) return;
+      const isCollapsed = side ? isNodeSideCollapsed(node, side) : node.collapsed;
+      if (!isCollapsed) return;
+      if (readonlyCollapsible) { setReadonlyCollapsed(nodeId, false, side); return; }
+      if (readonly) return;
+      runCommand({ type: "node.collapse", nodeIds: [nodeId], collapsed: false, side, meta: { source: "canvas", label: "Expand collapsed branch" } }, { autoLayout: true });
     },
     [readonly, readonlyCollapsible, runCommand, setReadonlyCollapsed, viewDocument.nodes],
   );
