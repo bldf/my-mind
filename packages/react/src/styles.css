@@ -1336,3 +1336,8 @@
   border-left: 2px solid var(--mmn-selected);
   border-radius: 0 8px 8px 0;
 }
+
+/* layout.measured：首次测量真实尺寸完成前隐藏画布，避免排布跳动 */
+.mmn-editor--measuring .react-flow {
+  visibility: hidden;
+}

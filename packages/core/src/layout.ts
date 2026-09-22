@@ -10,6 +10,21 @@ const CHARACTER_WIDTH = 8;
 const WIDE_LATIN_CHARACTER_WIDTH = 10.2;
 const NODE_WIDTH_SAFETY = 8;
 
+export interface LayoutNodeSize {
+  width: number;
+  height: number;
+}
+
+export interface SimpleTreeLayoutOptions {
+  /**
+   * 节点真实渲染尺寸（未乘 style.scale），优先于文本估算。
+   * 用于节点内容由宿主渲染、高度不固定的场景。
+   */
+  nodeSizes?: Record<string, LayoutNodeSize>;
+}
+
+type NodeSizeResolver = (node: MindMapNode) => LayoutNodeSize;
+
 interface LayoutBox {
   id: NodeId;
   side: -1 | 1;
@@ -73,10 +88,15 @@ export function estimateLayoutNodeHeight(node: Pick<MindMapNode, "metadata" | "s
   return NODE_BASE_HEIGHT + (lineCount - 1) * NODE_LINE_HEIGHT + statusHeight;
 }
 
-function estimateNodeSize(node: MindMapNode) {
+function isValidNodeSize(size: LayoutNodeSize | undefined): size is LayoutNodeSize {
+  return Boolean(size && Number.isFinite(size.width) && Number.isFinite(size.height) && size.width > 0 && size.height > 0);
+}
+
+function estimateNodeSize(node: MindMapNode, nodeSizes?: Record<string, LayoutNodeSize>): LayoutNodeSize {
   const scale = node.style.scale ?? 1;
-  const width = estimateLayoutNodeWidth(node);
-  const height = estimateLayoutNodeHeight(node);
+  const measuredSize = nodeSizes?.[node.id];
+  const width = isValidNodeSize(measuredSize) ? measuredSize.width : estimateLayoutNodeWidth(node);
+  const height = isValidNodeSize(measuredSize) ? measuredSize.height : estimateLayoutNodeHeight(node);
 
   return {
     width: width * scale,
@@ -89,14 +109,22 @@ function stackHeight(children: LayoutBox[], gapY: number): number {
   return children.reduce((total, child) => total + child.subtreeHeight, 0) + (children.length - 1) * gapY;
 }
 
-function buildLayoutBox(document: MindMapDocument, nodeId: NodeId, side: -1 | 1, gapY: number): LayoutBox {
+function buildLayoutBox(
+  document: MindMapDocument,
+  nodeId: NodeId,
+  side: -1 | 1,
+  gapY: number,
+  resolveSize: NodeSizeResolver,
+): LayoutBox {
   const node = document.nodes[nodeId];
   if (!node) {
     return { id: nodeId, side, width: MIN_NODE_WIDTH, height: NODE_BASE_HEIGHT, subtreeHeight: NODE_BASE_HEIGHT, children: [] };
   }
 
-  const size = estimateNodeSize(node);
-  const children = node.collapsed ? [] : node.children.map((childId) => buildLayoutBox(document, childId, side, gapY));
+  const size = resolveSize(node);
+  const children = node.collapsed
+    ? []
+    : node.children.map((childId) => buildLayoutBox(document, childId, side, gapY, resolveSize));
   const childrenHeight = stackHeight(children, gapY);
 
   return {
@@ -210,6 +238,7 @@ export interface BoundingBox {
 export function computeBoundingBox(
   positions: Record<string, Point>,
   document: MindMapDocument,
+  nodeSizes?: Record<string, LayoutNodeSize>,
 ): BoundingBox {
   let minX = Infinity;
   let minY = Infinity;
@@ -219,7 +248,7 @@ export function computeBoundingBox(
   for (const [id, pos] of Object.entries(positions)) {
     const node = document.nodes[id];
     if (!node) continue;
-    const size = estimateNodeSize(node);
+    const size = estimateNodeSize(node, nodeSizes);
     minX = Math.min(minX, pos.x);
     minY = Math.min(minY, pos.y);
     maxX = Math.max(maxX, pos.x + size.width);
@@ -245,7 +274,11 @@ export function applyLayoutResult(document: MindMapDocument, layout: LayoutResul
   return next;
 }
 
-export function simpleTreeLayout(document: MindMapDocument, rootId: NodeId = document.rootId): LayoutResult {
+export function simpleTreeLayout(
+  document: MindMapDocument,
+  rootId: NodeId = document.rootId,
+  options: SimpleTreeLayoutOptions = {},
+): LayoutResult {
   const started = typeof performance !== "undefined" ? performance.now() : Date.now();
   const positions: Record<string, Point> = {};
   const { gapX, gapY, direction } = document.layout;
@@ -262,7 +295,8 @@ export function simpleTreeLayout(document: MindMapDocument, rootId: NodeId = doc
 
   const compactGapX = clamp(gapX * 0.52, 88, 180);
   const compactGapY = clamp(gapY * 0.32, 18, 42);
-  const rootSize = estimateNodeSize(root);
+  const resolveSize: NodeSizeResolver = (node) => estimateNodeSize(node, options.nodeSizes);
+  const rootSize = resolveSize(root);
 
   positions[root.id] = {
     x: Math.round(-rootSize.width / 2),
@@ -275,9 +309,9 @@ export function simpleTreeLayout(document: MindMapDocument, rootId: NodeId = doc
     const pivot = shouldSplitRoot ? Math.ceil(root.children.length / 2) : root.children.length;
     const firstSide: -1 | 1 = shouldSplitRoot ? (direction === "left" ? 1 : -1) : direction === "left" ? -1 : 1;
     const secondSide: -1 | 1 = firstSide === -1 ? 1 : -1;
-    const firstBranch = root.children.slice(0, pivot).map((childId) => buildLayoutBox(document, childId, firstSide, compactGapY));
+    const firstBranch = root.children.slice(0, pivot).map((childId) => buildLayoutBox(document, childId, firstSide, compactGapY, resolveSize));
     const secondBranch = shouldSplitRoot
-      ? root.children.slice(pivot).map((childId) => buildLayoutBox(document, childId, secondSide, compactGapY))
+      ? root.children.slice(pivot).map((childId) => buildLayoutBox(document, childId, secondSide, compactGapY, resolveSize))
       : [];
 
     for (const branch of [firstBranch, secondBranch]) {
@@ -295,7 +329,7 @@ export function simpleTreeLayout(document: MindMapDocument, rootId: NodeId = doc
 
   // 当根节点不分裂（单子节点或无子节点）时，计算包围盒并将整体居中
   if (!shouldSplitRoot && Object.keys(positions).length > 0) {
-    const bounds = computeBoundingBox(positions, document);
+    const bounds = computeBoundingBox(positions, document, options.nodeSizes);
     const offsetX = -(bounds.minX + bounds.maxX) / 2;
     const offsetY = -(bounds.minY + bounds.maxY) / 2;
     for (const id of Object.keys(positions)) {

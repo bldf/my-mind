@@ -53,6 +53,13 @@ import { useViewportControl } from "./hooks/useViewportControl";
 import { useHistory } from "./hooks/useHistory";
 import { useDragInteraction, type DragSession } from "./hooks/useDragInteraction";
 import { useBranchListState } from "./hooks/useBranchListState";
+import {
+  applyCollapsedOverrides,
+  collectMeasuredNodeSizes,
+  hasAllNodeSizes,
+  type CollapsedOverrides,
+  type NodeSizeMap,
+} from "./measured-layout";
 
 export { isTextInputActive } from "./editor-utils";
 
@@ -66,6 +73,10 @@ const DEFAULT_READONLY_TOOLBAR: ViewToolbarControl[] = [
 ];
 const CANVAS_MIN_ZOOM = 0.08;
 const CANVAS_MAX_ZOOM = 2;
+/** 所有节点测量后，尺寸需保持这么久不变才视为稳定（异步内容如代码高亮、图片会改变尺寸）。 */
+const MEASURE_SETTLE_MS = 200;
+/** 测量迟迟未稳定（如节点不可见、内容持续变化）时，最多隐藏画布这么久。 */
+const MEASURE_REVEAL_TIMEOUT_MS = 1500;
 
 function EditorCanvas(props: MindMapEditorProps) {
   const controlled = props.value !== undefined;
@@ -82,6 +93,26 @@ function EditorCanvas(props: MindMapEditorProps) {
     initialDocumentRef.current = cloneDocument(document);
   }
   const readonly = Boolean(props.readonly);
+  const readonlyCollapsible = readonly && Boolean(props.readonlyCollapsible);
+  const measuredLayout = props.layout?.measured === true;
+  const [collapsedOverrides, setCollapsedOverrides] = useState<CollapsedOverrides>({});
+  const [nodeSizes, setNodeSizes] = useState<NodeSizeMap>({});
+  const [measurementSettled, setMeasurementSettled] = useState(false);
+  const [viewStateDocumentId, setViewStateDocumentId] = useState(document.id);
+  if (viewStateDocumentId !== document.id) {
+    setViewStateDocumentId(document.id);
+    setCollapsedOverrides({});
+    setNodeSizes({});
+    setMeasurementSettled(false);
+  }
+  const viewDocument = useMemo(() => {
+    const collapsedDocument = applyCollapsedOverrides(document, collapsedOverrides);
+    if (!measuredLayout && collapsedDocument === document) return document;
+    const layout = simpleTreeLayout(collapsedDocument, collapsedDocument.rootId, {
+      nodeSizes: measuredLayout ? nodeSizes : undefined,
+    });
+    return applyLayoutResult(collapsedDocument, layout);
+  }, [collapsedOverrides, document, measuredLayout, nodeSizes]);
   const onViewRootChange = props.onViewRootChange;
   const [selection, setSelection] = useState<SelectionState>({ nodeIds: [], connectionIds: [] });
 
@@ -102,7 +133,13 @@ function EditorCanvas(props: MindMapEditorProps) {
   const [themePanelOpen, setThemePanelOpen] = useState(Boolean(props.themePanel?.defaultOpen));
   const [searchOpen, setSearchOpen] = useState(false);
   const [inspectorOpen, setInspectorOpen] = useState(!props.inspector?.hidden);
-  const [localTheme, setLocalTheme] = useState<MindMapTheme | undefined>(props.theme);
+  // 只读模式下主题面板选择的主题；宿主传入的 theme 变化时以宿主为准
+  const [localTheme, setLocalTheme] = useState<MindMapTheme | undefined>(undefined);
+  const [prevPropsTheme, setPrevPropsTheme] = useState(props.theme);
+  if (prevPropsTheme !== props.theme) {
+    setPrevPropsTheme(props.theme);
+    setLocalTheme(undefined);
+  }
   const [copiedFormat, setCopiedFormat] = useState<CopyDataFormat | null>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const didInitialFlowDataSync = useRef(false);
@@ -277,21 +314,26 @@ function EditorCanvas(props: MindMapEditorProps) {
     },
     [commitSelection, document.nodes, readonly, runCommand],
   );
+  const setReadonlyCollapsed = useCallback((nodeId: NodeId, collapsed: boolean) => {
+    setCollapsedOverrides((current) => ({ ...current, [nodeId]: collapsed }));
+  }, []);
   const toggleNodeCollapse = useCallback(
     (nodeId: NodeId) => {
-      const node = document.nodes[nodeId];
+      const node = viewDocument.nodes[nodeId];
+      if (node && readonlyCollapsible) { setReadonlyCollapsed(nodeId, !node.collapsed); return; }
       if (!node || readonly) return;
       runCommand({ type: "node.collapse", nodeIds: [nodeId], collapsed: !node.collapsed, meta: { source: "canvas", label: "Toggle collapse" } }, { autoLayout: true });
     },
-    [document.nodes, readonly, runCommand],
+    [readonly, readonlyCollapsible, runCommand, setReadonlyCollapsed, viewDocument.nodes],
   );
   const expandCollapsedNode = useCallback(
     (nodeId: NodeId) => {
-      const node = document.nodes[nodeId];
+      const node = viewDocument.nodes[nodeId];
+      if (node?.collapsed && readonlyCollapsible) { setReadonlyCollapsed(nodeId, false); return; }
       if (!node || readonly || !node.collapsed) return;
       runCommand({ type: "node.collapse", nodeIds: [nodeId], collapsed: false, meta: { source: "canvas", label: "Expand collapsed branch" } }, { autoLayout: true });
     },
-    [document.nodes, readonly, runCommand],
+    [readonly, readonlyCollapsible, runCommand, setReadonlyCollapsed, viewDocument.nodes],
   );
   const resizeNodes = useCallback(
     (nodeIds: NodeId[], delta: number) => {
@@ -336,10 +378,12 @@ function EditorCanvas(props: MindMapEditorProps) {
 
   // --- Flow data ---
   const flowData = useMemo(
-    () => documentToFlow(document, {
+    () => documentToFlow(viewDocument, {
       viewRootId: effectiveViewRootId,
       selectedNodeIds: selection.nodeIds,
       readonly,
+      readonlyCollapsible,
+      nodeSizes: measuredLayout ? nodeSizes : undefined,
       dropIntent,
       flashNodeId,
       showAddChildControl: dragSettings.showAddChildControl,
@@ -360,7 +404,7 @@ function EditorCanvas(props: MindMapEditorProps) {
       renderNode: props.renderNode,
       theme,
     }),
-    [addChildNode, document, dragSettings.showAddChildControl, dragSettings.showCollapseControl, dropIntent, effectiveViewRootId, enterViewRoot, expandCollapsedNode, flashNodeId, onTitleCommit, props.nodeSizing?.scaleStep, props.nodeSizing?.showQuickControls, props.nodeSizing?.minScale, props.nodeSizing?.maxScale, props.renderNode, readonly, resizeNodes, onResizeProgress, onResizeCommit, selection.nodeIds, openNodeLink, toggleNodeCollapse, theme],
+    [addChildNode, viewDocument, readonlyCollapsible, measuredLayout, nodeSizes, dragSettings.showAddChildControl, dragSettings.showCollapseControl, dropIntent, effectiveViewRootId, enterViewRoot, expandCollapsedNode, flashNodeId, onTitleCommit, props.nodeSizing?.scaleStep, props.nodeSizing?.showQuickControls, props.nodeSizing?.minScale, props.nodeSizing?.maxScale, props.renderNode, readonly, resizeNodes, onResizeProgress, onResizeCommit, selection.nodeIds, openNodeLink, toggleNodeCollapse, theme],
   );
   latestFlowDataRef.current = flowData;
 
@@ -380,6 +424,21 @@ function EditorCanvas(props: MindMapEditorProps) {
   // --- Search hidden sync ---
   useEffect(() => { if (props.search?.hidden) setSearchOpen(false); }, [props.search?.hidden]);
 
+  // --- Measured layout ---
+  const allVisibleNodesMeasured = measuredLayout && hasAllNodeSizes(flowData.nodes.map((node) => node.id), nodeSizes);
+  const measuring = measuredLayout && !measurementSettled && flowData.nodes.length > 0;
+  useEffect(() => {
+    if (!measuring || !allVisibleNodesMeasured) return;
+    // nodeSizes 每次变化都会重置计时，尺寸稳定后才揭示画布并 fitView
+    const timer = setTimeout(() => setMeasurementSettled(true), MEASURE_SETTLE_MS);
+    return () => clearTimeout(timer);
+  }, [allVisibleNodesMeasured, measuring, nodeSizes]);
+  useEffect(() => {
+    if (!measuring) return;
+    const timer = setTimeout(() => setMeasurementSettled(true), MEASURE_REVEAL_TIMEOUT_MS);
+    return () => clearTimeout(timer);
+  }, [measuring]);
+
   // --- Auto-fit ---
   const autoFitKey = `${document.id}:${effectiveViewRootId}`;
   const renderedNodes = flowNodes.length > 0 || flowData.nodes.length === 0 ? flowNodes : flowData.nodes;
@@ -389,13 +448,14 @@ function EditorCanvas(props: MindMapEditorProps) {
 
   useEffect(() => {
     if (props.viewport?.fitViewOnInit === false || flowData.nodes.length === 0 || !renderedNodesContainEffectiveRoot) return;
+    if (measuring) return;
     if (lastAutoFitKey.current === autoFitKey) return;
     if (pendingBranchViewportUpdateRef.current) return;
     lastAutoFitKey.current = autoFitKey;
     const viewportOptions = { waitForNodeId: effectiveViewRootId };
     if (props.viewport?.fitViewOnInit === true) scheduleFitView(viewportOptions);
     else scheduleFit1to1View(viewportOptions);
-  }, [autoFitKey, effectiveViewRootId, flowData.nodes.length, props.viewport?.fitViewOnInit, renderedNodesContainEffectiveRoot, scheduleFitView, scheduleFit1to1View, pendingBranchViewportUpdateRef]);
+  }, [autoFitKey, measuring, effectiveViewRootId, flowData.nodes.length, props.viewport?.fitViewOnInit, renderedNodesContainEffectiveRoot, scheduleFitView, scheduleFit1to1View, pendingBranchViewportUpdateRef]);
 
   useEffect(() => {
     if (!pendingBranchViewportUpdateRef.current) return;
@@ -418,7 +478,8 @@ function EditorCanvas(props: MindMapEditorProps) {
   // --- Nodes change ---
   const onNodesChange = useCallback<OnNodesChange<MindFlowNode>>((changes) => {
     setFlowNodes((currentNodes) => applyNodeChanges(changes, currentNodes));
-  }, []);
+    if (measuredLayout) setNodeSizes((currentSizes) => collectMeasuredNodeSizes(changes, currentSizes));
+  }, [measuredLayout]);
 
   // --- Copy action handler ---
   const onCopyData = props.onCopyData;
@@ -655,11 +716,12 @@ function EditorCanvas(props: MindMapEditorProps) {
   return (
     <div
       ref={containerRef}
-      className={["mmn-editor", props.className, isSplitMode && "mmn-editor--split-mode", branchSwitchPending && "mmn-editor--branch-switching", sidebarCollapsed && "mmn-editor--sidebar-collapsed", sidebarPreviewOpen && "mmn-editor--sidebar-preview-open", sidebarPinned && "mmn-editor--sidebar-pinned"].filter(Boolean).join(" ")}
+      className={["mmn-editor", props.className, isSplitMode && "mmn-editor--split-mode", branchSwitchPending && "mmn-editor--branch-switching", sidebarCollapsed && "mmn-editor--sidebar-collapsed", sidebarPreviewOpen && "mmn-editor--sidebar-preview-open", sidebarPinned && "mmn-editor--sidebar-pinned", measuring && "mmn-editor--measuring"].filter(Boolean).join(" ")}
       style={style}
       onKeyDown={onKeyDown}
       tabIndex={0}
       data-theme-mode={theme.mode ?? "light"}
+      aria-busy={measuring || undefined}
       data-has-breadcrumbs={props.breadcrumbs?.hidden ? undefined : "true"}
     >
       {isSplitMode ? (

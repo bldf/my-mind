@@ -23,6 +23,7 @@ export interface MindNodeData extends Record<string, unknown> {
   highlighted?: boolean;
   flash?: boolean;
   readonly?: boolean;
+  readonlyCollapsible?: boolean;
   branchSide?: MindNodeBranchSide;
   dropIntent?: DropIntent;
   link?: NodeLink;
@@ -102,14 +103,15 @@ export const MindNode = memo(function MindNode(props: NodeProps) {
   const link = data.link;
   const canShowAddChild =
     !data.readonly && data.showAddChildControl !== false && Boolean(data.onAddChild);
+  const canToggleCollapse = !data.readonly || Boolean(data.readonlyCollapsible);
   const canShowCollapse =
-    !data.readonly &&
+    canToggleCollapse &&
     !hasCollapsedHiddenCount &&
     data.showCollapseControl !== false &&
     node.children.length > 0 &&
     Boolean(data.onToggleCollapse);
   const canExpandCollapsed =
-    hasCollapsedHiddenCount && !data.readonly && Boolean(data.onExpandCollapsed);
+    hasCollapsedHiddenCount && canToggleCollapse && Boolean(data.onExpandCollapsed);
   const canShowResizeControls =
     props.selected &&
     !data.readonly &&

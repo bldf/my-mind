@@ -166,4 +166,62 @@ describe("@my-mind-node/core", () => {
     expect(layout.positions[children[0]!]!.x).toBeLessThan(root.x);
     expect(layout.positions[children[1]!]!.x).toBeGreaterThan(root.x);
   });
+
+  describe("simpleTreeLayout nodeSizes", () => {
+    const createSiblingDocument = () => {
+      let document = createEmptyDocument({ rootTitle: "Root" });
+      const result = dispatchCommand(document, { type: "node.create", parentId: document.rootId, title: "Parent" });
+      if (!result.ok) throw new Error("command failed");
+      document = result.document;
+      const parentId = document.nodes[document.rootId]!.children[0]!;
+      for (const title of ["Tall", "Next"]) {
+        const r = dispatchCommand(document, { type: "node.create", parentId, title });
+        if (!r.ok) throw new Error("command failed");
+        document = r.document;
+      }
+      const [tallId, nextId] = document.nodes[parentId]!.children;
+      return { document, parentId, tallId: tallId!, nextId: nextId! };
+    };
+
+    it("stacks siblings by measured heights so tall nodes do not overlap", () => {
+      const { document, tallId, nextId } = createSiblingDocument();
+      const layout = simpleTreeLayout(document, document.rootId, {
+        nodeSizes: { [tallId]: { width: 320, height: 400 } },
+      });
+      const tall = layout.positions[tallId]!;
+      const next = layout.positions[nextId]!;
+
+      expect(next.y).toBeGreaterThanOrEqual(tall.y + 400);
+    });
+
+    it("places children beyond the measured parent width", () => {
+      const { document, parentId, tallId } = createSiblingDocument();
+      const layout = simpleTreeLayout(document, document.rootId, {
+        nodeSizes: { [parentId]: { width: 500, height: 40 } },
+      });
+      const parent = layout.positions[parentId]!;
+
+      expect(layout.positions[tallId]!.x).toBeGreaterThan(parent.x + 500);
+    });
+
+    it("falls back to estimated sizes for missing or invalid entries", () => {
+      const { document, tallId } = createSiblingDocument();
+      const estimated = simpleTreeLayout(document);
+      const withInvalidSize = simpleTreeLayout(document, document.rootId, {
+        nodeSizes: { [tallId]: { width: 0, height: Number.NaN } },
+      });
+
+      expect(withInvalidSize.positions).toEqual(estimated.positions);
+    });
+
+    it("applies node scale on top of measured sizes", () => {
+      const { document, tallId, nextId } = createSiblingDocument();
+      document.nodes[tallId]!.style.scale = 2;
+      const layout = simpleTreeLayout(document, document.rootId, {
+        nodeSizes: { [tallId]: { width: 100, height: 100 } },
+      });
+
+      expect(layout.positions[nextId]!.y).toBeGreaterThanOrEqual(layout.positions[tallId]!.y + 200);
+    });
+  });
 });

@@ -1,5 +1,5 @@
 import { getVisibleNodeIds, simpleTreeLayout } from "@my-mind-node/core";
-import type { MindMapDocument, MindMapNode, NodeId, MindMapTheme } from "@my-mind-node/core";
+import type { LayoutNodeSize, MindMapDocument, MindMapNode, NodeId, MindMapTheme } from "@my-mind-node/core";
 import type { ReactNode } from "react";
 import type { Edge, Node } from "@xyflow/react";
 import type { DropIntent, MindNodeBranchSide } from "./drag-interactions";
@@ -18,6 +18,8 @@ export interface FlowConversionOptions {
   selectedNodeIds?: NodeId[];
   highlightedNodeIds?: NodeId[];
   readonly?: boolean;
+  readonlyCollapsible?: boolean;
+  nodeSizes?: Record<string, LayoutNodeSize>;
   dropIntent?: DropIntent;
   flashNodeId?: NodeId;
   showAddChildControl?: boolean;
@@ -262,7 +264,7 @@ export function documentToFlow(
 
   let effectiveDocument = document;
   if (viewRootId !== document.rootId) {
-    const localLayout = simpleTreeLayout(document, viewRootId);
+    const localLayout = simpleTreeLayout(document, viewRootId, { nodeSizes: options.nodeSizes });
     const nextNodes = { ...document.nodes };
     for (const [nodeId, pos] of Object.entries(localLayout.positions)) {
       const orig = nextNodes[nodeId];
@@ -310,11 +312,13 @@ export function documentToFlow(
       type: "mindNode",
       position: { ...node.position },
       selected: selected.has(node.id),
+      ...(options.nodeSizes?.[node.id] ? { measured: { ...options.nodeSizes[node.id] } } : {}),
       data: {
         node,
         highlighted: highlighted.has(node.id),
         flash: options.flashNodeId === node.id,
         readonly: options.readonly,
+        readonlyCollapsible: options.readonlyCollapsible,
         branchSide: getBranchSide(effectiveDocument, node, viewRootId),
         dropIntent: getNodeDropIntent(options.dropIntent, node.id),
         link: getPrimaryNodeLink(node),

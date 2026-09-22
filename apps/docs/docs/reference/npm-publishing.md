@@ -68,8 +68,8 @@ npm view @my-mind-node/importers version --registry=https://registry.npmjs.org/
 npm view @my-mind-node/exporters version --registry=https://registry.npmjs.org/
 ```
 
-For the next beta after `0.1.0-beta.0`, update all publishable package versions
-to `0.1.0-beta.4`:
+Bump every publishable package to its next unpublished beta (for example
+`core`/`importers`/`exporters` `0.1.0-beta.5` and `react` `0.1.0-beta.6`):
 
 ```text
 packages/core/package.json

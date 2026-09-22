@@ -109,6 +109,14 @@ export interface BranchListLayoutConfig {
   maxSidebarWidthRatio?: number;
 }
 
+export interface LayoutConfig {
+  /**
+   * 使用 React Flow 测得的节点真实尺寸重新排布。
+   * 适合 renderNode 渲染高度不固定的内容；首次测量完成前画布隐藏。
+   */
+  measured?: boolean;
+}
+
 export interface MindMapEditorProps {
   value?: MindMapDocument;
   defaultValue?: MindMapDocument;
@@ -125,6 +133,9 @@ export interface MindMapEditorProps {
   search?: SearchConfig;
   dragInteraction?: DragInteractionConfig;
   branchListLayout?: BranchListLayoutConfig;
+  layout?: LayoutConfig;
+  /** 只读模式下允许折叠/展开分支（仅视图状态，不触发 onChange）。 */
+  readonlyCollapsible?: boolean;
   className?: string;
   renderNode?: (node: MindMapNode, selected: boolean) => ReactNode;
   onChange?: (document: MindMapDocument) => void;
